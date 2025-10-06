@@ -1,5 +1,0 @@
-"0","legend(""topleft"", legend = ""Moyenne"", col = ""red"", lty = 2, lwd = 2, bty = ""n"")
-"
-"2","Error in (function (s, units = ""user"", cex = NULL, font = NULL, vfont = NULL,  : 
-  plot.new has not been called yet
-"

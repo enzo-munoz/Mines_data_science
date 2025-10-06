@@ -1,0 +1,134 @@
+# Majeure Science des Données 2020-2021
+# Script TP n°2, Séries Temporelles 
+
+# Etude d'un AR(2)
+# Modèle X(t) = mu + phi1*(X(t-1)-mu) + phi2*(X(t-2)-mu) + Z(t)
+# Z[t] bruit blanc gaussien N(0,varZ)
+# Simulation d''un AR(2) par une phase initiale de stationnarisation
+
+# Inverses des racines du polynôme phi(z) = 1 - phi1*z - phi2*Z^2
+
+# Cas de deux racines réelles dans ]-1, 1[
+r1 <- 0.9
+r2 <- 0.9
+phi1 <- r1 + r2	
+phi2 <- - r1*r2			# paramètres AR(2) 
+
+# Cas de deux racines complexes conjuguées de module r < 1
+r <- 0.9
+angle <- 60 			# en degrés dans [0, 180]
+phi1 <- 2*r*cos(angle*pi/180)	
+phi2 <- - r*r			# paramètres AR(2) 
+
+mu <- 0				  # moyenne du processus X[t]
+sigZ <- 1				# écart-type du bruit Z[t]
+
+# Simulation avec régime transient de taille ninit = 50
+ninit <- 50
+n <- 200
+ntot <- ninit + n
+
+xtot <- rep(0,ntot)
+xtot[1] <- 10
+xtot[2] <- 10
+
+for (t in 3:ntot) xtot[t] <- phi1*xtot[t-1] + phi2*xtot[t-2] + sigZ*rnorm(1)
+
+xtot <- mu + xtot             # décentrage
+xinit <- xtot[1:ninit]        # régime transient (initial)
+
+xstat <- xtot[(ninit+1):ntot] # régime stationnaire --> AR(2) de taille n
+
+plot(xtot, type='o', xlab="Temps t", main = "AR(2) simulé avec régime transient", col="grey")
+lines((ninit+1):ntot, xstat, type='o')
+abline(mu, 0, col="red", lwd=2)
+
+ 
+# analyse graphique - chronogramme de la série xstat ( = AR(2))
+
+plot(xstat,type='o',xlab='Temps t',main = "Simulation d'un AR(2)")
+abline(mu,0,col='red')
+ 
+# acf et pacf de la série simulée
+op <- par(mfrow = c(1,2))
+ro <- acf(xstat, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(xstat, lag=15, ylim = c(-1,1), main = "et PACF empirique", xlim=c(0,15))
+par(op)
+
+###########################################################################
+#Partie 2
+###########################################################################
+
+# série n°1
+rm(list=ls())
+setwd("C:/Users/enzom/OneDrive/Bureau/MINES/SDD/série temporelles")
+load("serie1.RData")
+n <- length(serie)
+
+# chronogramme  
+plot(serie, type='o', xlab="Temps t", main = "série 1")
+mu <- mean(serie)
+sig.serie <- sd(serie)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.serie, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.serie, col="red", lwd=2,lty=2)
+
+# acf et pacf 
+op <- par(mfrow = c(1,2))
+ro <- acf(serie, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(serie, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+par(op)
+# conclusion : série n°1 AR(p=3)
+
+# série n°2
+rm(list=ls())
+load("serie2.RData")
+n <- length(serie)
+
+# chronogramme  
+plot(serie, type='o', xlab="Temps t", main = "série 2")
+mu <- mean(serie)
+sig.serie <- sd(serie)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.serie, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.serie, col="red", lwd=2,lty=2)
+
+# acf et pacf 
+op <- par(mfrow = c(1,2))
+ro <- acf(serie, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(serie, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+par(op)
+# conclusion : série n°2 = MA(q=4)
+
+# série n°3
+rm(list=ls())
+load("serie3.RData")
+n <- length(serie)
+
+# chronogramme  
+plot(serie, type='o', xlab="Temps t", main = "série 3")
+mu <- mean(serie)
+sig.serie <- sd(serie)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.serie, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.serie, col="red", lwd=2,lty=2)
+ro <- acf(serie, lag=15, ylim = c(-1,1), main = "ACF empirique")
+
+# conclusion : série non stationnaire, on différencie une fois pour s'y ramener
+serie.diff<- diff(serie)
+plot(serie.diff, type='o', xlab="Temps t", main = "serie 3 différenciée")
+mu <- mean(serie.diff)
+sig.serie <- sd(serie.diff)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.serie, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.serie, col="red", lwd=2,lty=2)
+# acf et pacf 
+op <- par(mfrow = c(1,2))
+ro <- acf(serie.diff, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(serie.diff, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+par(op)
+# conclusion : série n°3 = ARIMA(p=0,d=1,q=4)
+
+
+
+

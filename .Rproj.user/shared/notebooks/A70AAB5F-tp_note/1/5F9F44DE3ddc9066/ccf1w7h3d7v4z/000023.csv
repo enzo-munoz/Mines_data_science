@@ -1,0 +1,2 @@
+"0","mu<- mean(ts_temp)"
+"0","abline(h = mu, col = ""red"", lty = 2, lwd = 2)"
