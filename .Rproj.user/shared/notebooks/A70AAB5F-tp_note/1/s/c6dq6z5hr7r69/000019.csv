@@ -1,0 +1,3 @@
+"0",""
+"0","# ACF de la série différenciée"
+"0","acf(ts_diff1, main = ""ACF - Série Différenciée (d=1)"", lag.max = 36)"

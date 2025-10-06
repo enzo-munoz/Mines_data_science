@@ -30,7 +30,6 @@ if (!require("TSstudio")) install.packages("TSstudio")
 if (!require("moments")) install.packages("moments")
 if (!require("psych")) install.packages("psych")
 
-# Charger les packages
 library(dplyr)
 library(tidyr)
 library(lubridate)
@@ -110,33 +109,93 @@ legend("topleft", legend = "Moyenne", col = "red", lty = 2, lwd = 2, bty = "n")
 
 
 ```
+Forme sinusoïdale qui vient de la saisonnalité des températures. 
+```{r}
+# Extraire les mois (1 à 12)
+months <- cycle(ts_temp)
 
-## Including Plots
+df <- data.frame(Month = factor(months, levels = 1:12, labels = month.abb),
+                 Temp = as.numeric(ts_temp))
 
-You can also embed plots, for example:
+# Tracer les boxplots par mois
+ggplot(df, aes(x = Month, y = Temp)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Distribution des températures par mois",
+       x = "Mois",
+       y = "Température (°C)") +
+  theme_minimal()
+
+```
 
 ```{r, echo=FALSE}
 
 op <- par(mfrow = c(1,2))
-ro <- acf(serie, lag=15, ylim = c(-1,1), main = "ACF empirique")
-alpha <- pacf(serie, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+ro <- acf(ts_temp, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(ts_temp, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
 par(op)
 
-ts_temp
-
 ```
-La série temporelle est pas stationnaire 
+La série temporelle n'est pas stationnaire 
 ```{r}
-ts_temp.diff<- diff(ts_temp, lag=12)
-plot(serie.diff, type='o', main = "série différenciée")
-mu <- mean(serie.diff)
-sig.serie <- sd(ts_temp.diff)
-abline(h=mu, col="red", lwd=2)
-abline(h=mu+2*sig.serie, col="red", lwd=2,lty=2)
-abline(h=mu-2*sig.serie, col="red", lwd=2,lty=2)
+# Différenciation simple
+ts_diff1 <- diff(ts_temp, differences = 1)
 
-ts_temp.diff
+# Différenciation saisonnière
+ts_diff_seas <- diff(ts_temp, lag = 12)
+
+# Tests sur séries différenciées
+par(mfrow = c(2, 2))
+plot(ts_temp, main = "Série Originale", ylab = "Température", col = "blue", lwd = 1.5)
+plot(ts_diff1, main = "Différenciation d = 1", ylab = "Diff(Température)", col = "red", lwd = 1.5)
+abline(h = 0, lty = 2)
+plot(ts_diff_seas, main = "Différenciation Saisonnière (lag=12)", 
+     ylab = "Diff(Température)", col = "green4", lwd = 1.5)
+abline(h = 0, lty = 2)
+
+# ACF de la série différenciée
+acf(ts_diff1, main = "ACF - Série Différenciée (d=1)", lag.max = 36)
+
+# Test ADF sur série différenciée
+adf_diff <- adf.test(ts_diff1)
+cat("\nTest ADF après différenciation (d=1) :\n")
+cat("p-value :", round(adf_diff$p.value, 4), "\n")
+```
+La différentiationd'ordre 1 n'est pas satisfaisante. Regardons avec lag 12. 
+```{r}
+des_data<- diff(ts_temp, lag=12)
+plot(des_data, type='o', main = "série différenciée")
+mu <- mean(des_data)
+sig.des_data <- sd(des_data)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.des_data, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.des_data, col="red", lwd=2,lty=2)
+
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+op <- par(mfrow = c(1,2))
+ro <- acf(des_data, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(des_data, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+par(op)
+```
+8.Test de stationnarité
+```{r}
+
+adf_test <- adf.test(des_data, alternative = "stationary")
+
+print(adf_test)
+
+cat("\nINTERPRÉTATION :\n")
+cat("- H0 : la série n'est pas Stationnaire\n")
+if (adf_test$p.value > 0.05) {
+  cat("- p-value ≥ 0.05 → On NE REJETTE PAS H0\n")
+  cat("- ✗ La série n'est pas stationnaire\n\n")
+} else {
+  cat("- p-value < 0.05 → On REJETTE H0\n")
+  cat("- ✓ La série est stationnaire.\n")
+}
+
+```
+
+

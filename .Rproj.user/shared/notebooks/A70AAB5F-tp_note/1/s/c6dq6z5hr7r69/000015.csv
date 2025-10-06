@@ -1,0 +1,2 @@
+"0","plot(ts_diff_seas, main = ""Différenciation Saisonnière (lag=12)"", "
+"0","     ylab = ""Diff(Température)"", col = ""green4"", lwd = 1.5)"

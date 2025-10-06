@@ -1,0 +1,3 @@
+"0",""
+"0","op <- par(mfrow = c(1,2))"
+"0","ro <- acf(ts_temp, lag=15, ylim = c(-1,1), main = ""ACF empirique"")"
