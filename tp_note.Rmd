@@ -231,9 +231,10 @@ print(summary(fit_auto))
 ```{r}
 # Tester plusieurs modèles manuellement
 models <- list(
-  "ARIMA(1,1,1)(1,1,1)[12]" = Arima(des_data, order = c(1,1,1), seasonal = c(1,1,1)),
-  "ARIMA(2,1,2)(1,1,1)[12]" = Arima(des_data, order = c(2,1,2), seasonal = c(1,1,1)),
-  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,1,2), seasonal = c(2,1,1))
+  "ARIMA(1,1,1)(1,1,1)[12]" = Arima(des_data, order = c(1,0,1), seasonal = c(1,1,1)),
+  "ARIMA(2,1,2)(1,1,1)[12]" = Arima(des_data, order = c(2,0,2), seasonal = c(1,1,1)),
+  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,0,2), seasonal = c(2,1,1)),
+  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,0,2), seasonal = c(2,1,1))
 )
 
 # Comparaison des critères
@@ -256,6 +257,7 @@ comparison <- rbind(
   comparison
 )
 
+
 comparison <- comparison %>% arrange(AICc)
 
 knitr::kable(comparison, 
@@ -265,3 +267,140 @@ knitr::kable(comparison,
 cat("\n✓ Le meilleur modèle selon AICc est :", comparison$Modèle[1], "\n")
 ```
 
+```{r}
+# Utiliser le modèle auto.arima
+checkresiduals(fit_auto)
+
+# Tests supplémentaires
+cat("\n--- Tests Complémentaires sur les Résidus ---\n\n")
+
+# Test de Ljung-Box
+residus <- residuals(fit_auto)
+ljung_box <- Box.test(residus, lag = 20, type = "Ljung-Box")
+cat("Test de Ljung-Box (H0 : pas d'autocorrélation) :\n")
+cat("  p-value =", round(ljung_box$p.value, 4), "\n")
+if (ljung_box$p.value > 0.05) {
+  cat("  ✓ Les résidus sont un bruit blanc (p > 0.05)\n\n")
+} else {
+  cat("  ✗ Autocorrélation résiduelle détectée (p < 0.05)\n\n")
+}
+
+# Test de Shapiro-Wilk (normalité)
+shapiro_test <- shapiro.test(residus)
+cat("Test de Shapiro-Wilk (H0 : normalité) :\n")
+cat("  p-value =", round(shapiro_test$p.value, 4), "\n")
+if (shapiro_test$p.value > 0.05) {
+  cat("  ✓ Les résidus suivent une loi normale (p > 0.05)\n\n")
+} else {
+  cat("  ✗ Les résidus ne suivent pas une loi normale (p < 0.05)\n\n")
+}
+```
+```{r}
+# Analyse détaillée des résidus
+par(mfrow = c(2, 3))
+
+# 1. Résidus dans le temps
+plot(residus, main = "Résidus du Modèle", ylab = "Résidus", col = "steelblue", type = "l")
+abline(h = 0, col = "red", lty = 2, lwd = 2)
+
+# 2. ACF des résidus
+acf(residus, main = "ACF des Résidus", lag.max = 36)
+
+# 3. PACF des résidus
+pacf(residus, main = "PACF des Résidus", lag.max = 36)
+
+# 4. Histogramme
+hist(residus, breaks = 30, main = "Distribution des Résidus",
+     xlab = "Résidus", col = "lightblue", border = "white", probability = TRUE)
+curve(dnorm(x, mean = mean(residus), sd = sd(residus)), add = TRUE, col = "red", lwd = 2)
+
+# 5. QQ-plot
+qqnorm(residus, main = "QQ-Plot des Résidus")
+qqline(residus, col = "red", lwd = 2)
+
+# 6. Résidus carrés (hétéroscédasticité)
+plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple", type = "h")
+abline(h = mean(residus^2), col = "red", lty = 2)
+```
+```{r}
+# Prévisions 12 mois
+forecast_12 <- forecast(fit_auto, h = 12)
+
+# Visualisation
+plot(forecast_12,
+     main = "Prévisions de Température (12 mois)",
+     ylab = "Température (°C)",
+     xlab = "Année",
+     col = "steelblue",
+     lwd = 2,
+     shadecols = c("lightblue", "lightgray"))
+legend("topleft", 
+       legend = c("Observé", "Prévision", "IC 80%", "IC 95%"),
+       col = c("steelblue", "blue", "lightblue", "lightgray"),
+       lwd = c(2, 2, 10, 10),
+       bty = "n")
+
+# Tableau des prévisions
+forecast_df <- data.frame(
+  Mois = 1:12,
+  Prévision = round(forecast_12$mean, 2),
+  IC_Inf_95 = round(forecast_12$lower[, 2], 2),
+  IC_Sup_95 = round(forecast_12$upper[, 2], 2)
+)
+
+knitr::kable(forecast_df,
+             caption = "Prévisions Mensuelles (12 prochains mois)",
+             col.names = c("Mois", "Prévision (°C)", "IC Inf 95%", "IC Sup 95%"))
+```
+```{r}
+# Prévisions 24 mois
+forecast_24 <- forecast(fit_auto, h = 12)
+
+plot(forecast_24,
+     main = "Prévisions de Température (24 mois)",
+     ylab = "Température (°C)",
+     xlab = "Année",
+     col = "steelblue",
+     lwd = 2,
+     shadecols = c("lightblue", "lightgray"))
+```
+A 24 moi il y des problèmes !! il faut garder h = 12
+Backtest ? 
+```{r}
+# Validation croisée temporelle
+# Garder les 12 derniers mois comme test
+n_test <- 12
+ts_train <- window(des_data, end = time(des_data)[length(ts_temp) - n_test])
+ts_test <- window(des_data, start = time(des_data)[length(ts_temp) - n_test + 1])
+
+# Réestimer le modèle sur train
+fit_train <- auto.arima(ts_train, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
+
+# Prévisions
+forecast_test <- forecast(fit_train, h = n_test)
+
+# Calculer les erreurs
+errors <- ts_test - forecast_test$mean
+mae <- mean(abs(errors))
+rmse <- sqrt(mean(errors^2))
+mape <- mean(abs(errors / ts_test)) * 100
+
+cat("Métriques de Performance (Backtesting) :\n")
+cat("----------------------------------------\n")
+cat("MAE  (Mean Absolute Error)       :", round(mae, 4), "°C\n")
+cat("RMSE (Root Mean Squared Error)   :", round(rmse, 4), "°C\n")
+cat("MAPE (Mean Absolute Percentage Error) :", round(mape, 2), "%\n")
+
+# Visualisation
+plot(des_data, main = "Validation Croisée : Prévisions vs Réalisations",
+     ylab = "Température (°C)", col = "black", lwd = 1.5)
+lines(forecast_test$mean, col = "red", lwd = 2)
+lines(forecast_test$lower[, 2], col = "blue", lty = 2)
+lines(forecast_test$upper[, 2], col = "blue", lty = 2)
+legend("topleft",
+       legend = c("Observé", "Prévision", "IC 95%"),
+       col = c("black", "red", "blue"),
+       lwd = c(1.5, 2, 1),
+       lty = c(1, 1, 2),
+       bty = "n")
+```
