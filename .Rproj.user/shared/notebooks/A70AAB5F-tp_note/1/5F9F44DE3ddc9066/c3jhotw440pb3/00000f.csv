@@ -1,0 +1,14 @@
+"0","if (!require(""psych"")) install.packages(""psych"")
+"
+"2","Loading required package: psych
+"
+"2","Warning: package ‘psych’ was built under R version 4.5.1"
+"2","
+Attaching package: ‘psych’
+
+"
+"2","The following objects are masked from ‘package:ggplot2’:
+
+    %+%, alpha
+
+"
