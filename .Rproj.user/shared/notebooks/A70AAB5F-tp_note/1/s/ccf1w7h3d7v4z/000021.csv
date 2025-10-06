@@ -1,7 +1,0 @@
-"0",""
-"0","plot(ts_temp,"
-"0","     main = ""Série Temporelle : Température Moyenne Mensuelle"","
-"0","     ylab = ""Température (°C)"","
-"0","     xlab = ""Année"","
-"0","     col = ""steelblue"","
-"0","     lwd = 2)"

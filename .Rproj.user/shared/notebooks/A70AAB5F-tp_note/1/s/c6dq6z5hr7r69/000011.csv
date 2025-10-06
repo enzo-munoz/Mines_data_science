@@ -1,1 +1,0 @@
-"0","plot(ts_diff1, main = ""Différenciation d = 1"", ylab = ""Diff(Température)"", col = ""red"", lwd = 1.5)"

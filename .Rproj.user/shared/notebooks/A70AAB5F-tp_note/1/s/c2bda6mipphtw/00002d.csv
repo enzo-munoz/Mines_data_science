@@ -1,2 +1,0 @@
-"0","op <- par(mfrow = c(1,2))"
-"0","ro <- acf(des_data, lag=15, ylim = c(-1,1), main = ""ACF empirique"")"

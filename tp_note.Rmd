@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Contexte du TP
 
 
-```{r}
+```{r, echo=FALSE}
 # Gestion des données
 if (!require("dplyr")) install.packages("dplyr")
 if (!require("tidyr")) install.packages("tidyr")
@@ -110,7 +110,7 @@ legend("topleft", legend = "Moyenne", col = "red", lty = 2, lwd = 2, bty = "n")
 
 ```
 Forme sinusoïdale qui vient de la saisonnalité des températures. 
-```{r}
+```{r, echo=FALSE}
 # Extraire les mois (1 à 12)
 months <- cycle(ts_temp)
 
@@ -136,7 +136,7 @@ par(op)
 
 ```
 La série temporelle n'est pas stationnaire 
-```{r}
+```{r, echo=FALSE}
 # Différenciation simple
 ts_diff1 <- diff(ts_temp, differences = 1)
 
@@ -161,7 +161,7 @@ cat("\nTest ADF après différenciation (d=1) :\n")
 cat("p-value :", round(adf_diff$p.value, 4), "\n")
 ```
 La différentiationd'ordre 1 n'est pas satisfaisante. Regardons avec lag 12. 
-```{r}
+```{r, echo=FALSE}
 des_data<- diff(ts_temp, lag=12)
 plot(des_data, type='o', main = "série différenciée")
 mu <- mean(des_data)
@@ -173,14 +173,14 @@ abline(h=mu-2*sig.des_data, col="red", lwd=2,lty=2)
 
 ```
 
-```{r}
+```{r, echo=FALSE}
 op <- par(mfrow = c(1,2))
 ro <- acf(des_data, lag=15, ylim = c(-1,1), main = "ACF empirique")
 alpha <- pacf(des_data, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
 par(op)
 ```
 8.Test de stationnarité
-```{r}
+```{r, echo=FALSE}
 
 adf_test <- adf.test(des_data, alternative = "stationary")
 
@@ -197,5 +197,71 @@ if (adf_test$p.value > 0.05) {
 }
 
 ```
+```{r, echo=FALSE}
+# Test KPSS
+kpss_result <- kpss.test(des_data)
+cat("\nTest KPSS sur la série brute :\n")
+cat("-------------------------------\n")
+cat("Statistique KPSS :", round(kpss_result$statistic, 4), "\n")
+cat("p-value :", round(kpss_result$p.value, 4), "\n\n")
 
+if (kpss_result$p.value < 0.05) {
+  cat("✗ La série est NON-STATIONNAIRE (p < 0.05)\n")
+} else {
+  cat("✓ La série est STATIONNAIRE (p ≥ 0.05)\n")
+}
+```
+Partie 2 : Modélisation et analyse 
+```{r}
+# Sélection automatique avec auto.arima
+cat("Sélection automatique du meilleur modèle ARIMA...\n\n")
+
+fit_auto <- auto.arima(des_data,
+                       seasonal = TRUE,
+                       stepwise = FALSE,
+                       approximation = FALSE,
+                       trace = TRUE,
+                       ic = "aicc")
+
+cat("\n========================================\n")
+cat("MEILLEUR MODÈLE SÉLECTIONNÉ\n")
+cat("========================================\n")
+print(summary(fit_auto))
+```
+```{r}
+# Tester plusieurs modèles manuellement
+models <- list(
+  "ARIMA(1,1,1)(1,1,1)[12]" = Arima(des_data, order = c(1,1,1), seasonal = c(1,1,1)),
+  "ARIMA(2,1,2)(1,1,1)[12]" = Arima(des_data, order = c(2,1,2), seasonal = c(1,1,1)),
+  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,1,2), seasonal = c(2,1,1))
+)
+
+# Comparaison des critères
+comparison <- data.frame(
+  Modèle = names(models),
+  AIC = sapply(models, AIC),
+  BIC = sapply(models, BIC),
+  AICc = sapply(models, function(m) m$aicc),
+  LogLik = sapply(models, logLik)
+)
+
+comparison <- rbind(
+  data.frame(
+    Modèle = "Auto ARIMA",
+    AIC = AIC(fit_auto),
+    BIC = BIC(fit_auto),
+    AICc = fit_auto$aicc,
+    LogLik = logLik(fit_auto)
+  ),
+  comparison
+)
+
+comparison <- comparison %>% arrange(AICc)
+
+knitr::kable(comparison, 
+             caption = "Comparaison des Modèles ARIMA",
+             digits = 2)
+
+cat("\n✓ Le meilleur modèle selon AICc est :", comparison$Modèle[1], "\n")
+```
 

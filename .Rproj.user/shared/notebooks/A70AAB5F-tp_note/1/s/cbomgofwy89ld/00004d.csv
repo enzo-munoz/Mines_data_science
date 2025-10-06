@@ -1,3 +1,0 @@
-"0","mu <- mean(des_data)"
-"0","sig.des_data <- sd(des_data)"
-"0","abline(h=mu, col=""red"", lwd=2)"

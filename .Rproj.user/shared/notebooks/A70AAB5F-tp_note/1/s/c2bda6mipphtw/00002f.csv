@@ -1,1 +1,0 @@
-"0","alpha <- pacf(des_data, lag=15, ylim = c(-1,1), main = ""et PACF"", xlim=c(0,15))"
