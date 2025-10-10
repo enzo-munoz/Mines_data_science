@@ -10,7 +10,7 @@ library(lubridate)
 library(moments)
 library (tseries)
 
-data <- read.csv("C:\\Users\\hugom\\OneDrive - Aescra Emlyon Business School\\Mines de Saint-Etienne\\3A\\Science des données\\Série temporelle\\TP évalué\\data.csv")
+data <- read.csv("data.csv", stringsAsFactors = FALSE)
 
 #head(data)
 #str(data)

@@ -8,6 +8,7 @@ date: "2025-10-02"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
 ```
 
 ## Contexte du TP
@@ -77,14 +78,11 @@ aplatissement <- kurtosis(temperature, na.rm = TRUE)
 ```
 
 ```{r, echo = FALSE}
-# D'abord, on crée un data.frame avec les statistiques
 stats_df <- data.frame(
   Statistique = c("Moyenne", "Médiane", "Variance", "Skewness (asymétrie)", "Kurtosis (aplatissement)"),
   Valeur = c(moyenne, mediane, variance, asymetrie, aplatissement)
 )
 
-# Ensuite, on utilise kable() pour créer un joli tableau
-# Le paramètre 'digits' permet d'arrondir joliment toutes les valeurs
 knitr::kable(
   stats_df,
   caption = "Statistiques descriptives de la série temporelle",
@@ -145,18 +143,8 @@ ggplot(data = ecart_type_par_mois, aes(x = Month, y = Ecart_Type_Temp)) +
   ) +
   theme_minimal()
 
-ecart_type_par_mois
 ```
 #La volatilité dépend du mois étudié. Sur le graphe on voit l'hétéroscélasticité des températures, notament un écart type plus important pour le mois de Janvier avec un écart type de 1.876471°C ou Février avec 2.472963°c contre un écart type de température plus faible pour les mois de Mars ou Avril (1.350898°C resp. 1.497665°C) par exemple.
-
-```{r, echo=FALSE}
-
-op <- par(mfrow = c(1,2))
-ro <- acf(temperature, lag=15, ylim = c(-1,1), main = "ACF empirique")
-alpha <- pacf(temperature, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
-par(op)
-
-```
 
 ```{r, echo=FALSE}
 # Différenciation simple
@@ -208,11 +196,9 @@ axis(1, at = 0:36/12, labels = 0:36)
 
 
 ```{r, echo=FALSE}
-# 1. EXÉCUTER LE TEST EN PREMIER (c'est l'étape la plus importante)
 adf_test <- adf.test(des_data, alternative = "stationary")
 
-# 2. PRÉPARER LA PARTIE CONDITIONNELLE DE L'INTERPRÉTATION
-#    On stocke le résultat du if/else dans une variable.
+
 if (adf_test$p.value > 0.05) {
   interpretation_texte <- paste(
     "- p-value ≥ 0.05 → On NE REJETTE PAS H0",
@@ -227,7 +213,6 @@ if (adf_test$p.value > 0.05) {
   )
 }
 
-# 3. ASSEMBLER LE TEXTE FINAL EN UTILISANT LA VARIABLE CRÉÉE
 texte_final <- paste(
   "INTERPRÉTATION DU TEST ADF :",
   "-----------------------------",
@@ -236,12 +221,7 @@ texte_final <- paste(
   sep = "\n"
 )
 
-# 4. AFFICHER LES RÉSULTATS
-# D'abord le résultat brut du test
 print(adf_test)
-
-# Puis notre interprétation formatée
-cat("\n") # Ajoute une ligne vide pour séparer
 cat(texte_final)
 
 ```
@@ -263,8 +243,184 @@ if (kpss_result$p.value < 0.05) {
 }
 ```
 
-Partie 2 : Modélisation et analyse 
 ```{r}
+
+
+resultats <- data.frame(type = character(),
+                       odre = integer(),
+                       AIC = numeric(),
+                       BIC = numeric())
+
+for (p in 1:5){
+  fit <- tryCatch({
+    arima(des_data, order = c(p,0,0), method="ML")
+  }, error=function(e) NULL)
+  
+  if(!is.null(fit)){
+    resultats <- rbind(resultats, data.frame(
+      type = "AR",
+      ordre = p,
+      AIC = AIC(fit),
+      BIC = BIC(fit)
+    ))
+  }
+}
+
+for (q in 1:5){
+  fit <- tryCatch({
+    arima(des_data, order = c(0,0,q), method="ML")
+  }, error=function(e) NULL)
+  
+  if(!is.null(fit)){
+    resultats <- rbind(resultats, data.frame(
+      type = "MA",
+      ordre = q,
+      AIC = AIC(fit),
+      BIC = BIC(fit)
+    ))
+  }
+}
+
+print(resultats)
+
+meilleur_AIC <- resultats[which.min(resultats$AIC),]
+meilleur_BIC <- resultats[which.min(resultats$BIC),]
+
+meilleur_AIC_AR <- resultats[resultats$type == "AR", ][which.min(resultats[resultats$type == "AR", ]$AIC), ]
+meilleur_BIC_AR <- resultats[resultats$type == "AR", ][which.min(resultats[resultats$type == "AR", ]$BIC), ]
+
+meilleur_AIC_MA <- resultats[resultats$type == "MA", ][which.min(resultats[resultats$type == "MA", ]$AIC), ]
+meilleur_BIC_MA <- resultats[resultats$type == "MA", ][which.min(resultats[resultats$type == "MA", ]$BIC), ]
+
+cat("Meilleur modèle selon AIC:", meilleur_AIC$type, "(",meilleur_AIC$ordre, ")\n",
+    "Meilleur modèle selon BIC:", meilleur_BIC$type, "(",meilleur_BIC$ordre, ")\n", 
+    "Meilleur modèle AR selon AIC:", meilleur_AIC_AR$type, "(",meilleur_AIC_AR$ordre, ")\n",
+    "Meilleur modèle AR selon BIC:", meilleur_BIC_AR$type, "(",meilleur_BIC_AR$ordre, ")\n",
+    "Meilleur modèle MA selon AIC:", meilleur_AIC_MA$type, "(",meilleur_AIC_MA$ordre, ")\n",
+    "Meilleur modèle MA selon BIC:", meilleur_BIC_MA$type, "(",meilleur_BIC_MA$ordre, ")\n"
+    )
+
+```
+Effectivement, les modèles avec plus de paramètres ont un meilleur AIC mais c'est dû à un "sur-apprentissage" qui est mis en évidence par la mesure du BIC qui met les modèles AR(1) et MA(1) en avant. On comprend bien intuitivement que la température moyenne pour le mois de juin par exemple dépend peu de la température de la même année en Janvier. 
+
+```{r, warning=FALSE}
+
+resultats_ARMA <- data.frame(
+  p = integer(),
+  q = integer(),
+  AIC = numeric(),
+  BIC = numeric()
+)
+
+for (p in 0:5){
+  for (q in 0:5){
+    if (p==0 & q==0) next
+    
+    fit <- tryCatch({
+      arima(des_data, order = c(p,0,q), method="ML")
+    }, error = function(e) NULL)
+    
+    if (!is.null(fit)){
+      resultats_ARMA <- rbind(resultats_ARMA, data.frame(
+        p = p,
+        q = q,
+        AIC = AIC(fit),
+        BIC = BIC(fit)
+      ))
+    }
+  }
+}
+
+
+meilleur_AIC_ARMA <- resultats_ARMA[which.min(resultats_ARMA$AIC),]
+meilleur_BIC_ARMA <- resultats_ARMA[which.min(resultats_ARMA$BIC),]
+
+cat("\nMeilleur modèle ARMA selon AIC: ARMA(",meilleur_AIC_ARMA$p, "0",meilleur_AIC_ARMA$q, ")\n","Meilleur modèle ARMA selon BIC: ARMA(",meilleur_BIC_ARMA$p, "0",meilleur_BIC_ARMA$q, ")") 
+
+resultats_ARMA$p <- as.factor(resultats_ARMA$p)
+resultats_ARMA$q <- as.factor(resultats_ARMA$q)
+
+heatmap_plot <- ggplot(resultats_ARMA, aes(x = q, y = p, fill = BIC)) +
+  geom_tile(color = "white", lwd = 0.5) + 
+  geom_text(aes(label = round(BIC, 1)), color = "black", size = 3.5) +
+  scale_fill_viridis_c(direction = -1) + 
+  labs(
+    title = "Heatmap du BIC pour différents modèles ARMA(p,q)",
+    x = "Ordre 'q' (Moyenne Mobile)",
+    y = "Ordre 'p' (Autorégressif)",
+    fill = "BIC"
+  ) +
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    axis.title = element_text(size = 12)
+  )
+
+# Afficher le graphique
+print(heatmap_plot)
+
+```
+
+
+Partie 2 : Modélisation et analyse 
+
+```{r}
+modele_AR <- arima(des_data, order = c(4,0,0), method="ML")
+modele_ARMA <- arima(des_data, order = c(5,0,5), method="ML")
+AIC_ARMA = AIC(modele_ARMA)
+AIC_AR = AIC(modele_AR)
+print(AIC_AR)
+print(AIC_ARMA)
+
+res_AR <- residuals(modele_AR)
+res_ARMA <- residuals(modele_ARMA)
+```
+```{r}
+par(mfrow = c(2,1))
+
+acf(res_AR, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(4)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_ARMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(res_AR, lag=20, type="Ljung-Box")
+Box.test(res_ARMA, lag=20, type="Ljung-Box")
+
+hist(res_AR, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
+hist(res_ARMA, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
+
+```
+Les résidus ne peuvent pas être considéré comme des bruits blancs au vu du test de Ljung-Box avec des p_value égal à des 0 machine. On le voit avec le plot des ACF des 2 modèles qui montrent une corrélation au lag 12 (Le mois de l'année précedente). 
+
+```{r}
+modele_AR_1 <- arima(des_data, order = c(1,0,0), method="ML")
+modele_MA_1 <- arima(des_data, order = c(0,0,1), method="ML")
+AIC_AR_1 = AIC(modele_AR_1)
+AIC_MA_1 = AIC(modele_MA_1)
+print(AIC_AR_1)
+print(AIC_MA_1)
+
+res_AR_1 <- residuals(modele_AR_1)
+res_MA_1 <- residuals(modele_MA_1)
+```
+
+```{r}
+par(mfrow = c(2,1))
+
+acf(res_AR_1, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(4)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_MA_1, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(res_AR_1, lag=20, type="Ljung-Box")
+Box.test(res_MA_1, lag=20, type="Ljung-Box")
+
+hist(res_AR_1, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
+hist(res_MA_1, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
+```
+Pas non plus de Ljung-Box
+
+```{r, echo=FALSE}
 # Sélection automatique avec auto.arima
 cat("Sélection automatique du meilleur modèle ARIMA...\n\n")
 
@@ -355,11 +511,10 @@ par(mfrow = c(2, 3))
 plot(residus, main = "Résidus du Modèle", ylab = "Résidus", col = "steelblue", type = "l")
 abline(h = 0, col = "red", lty = 2, lwd = 2)
 
-# 2. ACF des résidus
-acf(residus, main = "ACF des Résidus", lag.max = 36)
-
-# 3. PACF des résidus
-pacf(residus, main = "PACF des Résidus", lag.max = 36)
+acf(residus, lag.max = 36, xaxt = "n", main = "ACF des résidus auto.arima")
+axis(1, at = 0:36/12, labels = 0:36)
+pacf(residus, lag.max = 36, xaxt = "n", main = "ACF des résidus auto.arima")
+axis(1, at = 0:36/12, labels = 0:36)
 
 # 4. Histogramme
 hist(residus, breaks = 30, main = "Distribution des Résidus",
@@ -370,10 +525,57 @@ curve(dnorm(x, mean = mean(residus), sd = sd(residus)), add = TRUE, col = "red",
 qqnorm(residus, main = "QQ-Plot des Résidus")
 qqline(residus, col = "red", lwd = 2)
 
-# 6. Résidus carrés (hétéroscédasticité)
+# 6. Résidus carrés 
 plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple", type = "h")
 abline(h = mean(residus^2), col = "red", lty = 2)
 ```
+```{r}
+
+ArchTest(res_AR, lags=10)
+ArchTest(residus, lags=10)
+
+spec_ARMA_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
+  distribution.model = "norm"
+)
+
+spec_AR_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
+  distribution.model = "std"
+)
+
+modele_ARMA_ARCH <- ugarchfit(spec = spec_ARMA_ARCH, data = des_data)
+modele_AR_ARCH <- ugarchfit(spec = spec_AR_ARCH, data = des_data)
+
+spec_ARMA_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
+  distribution.model = "norm"
+)
+
+spec_AR_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
+  distribution.model = "std"
+)
+
+modele_ARMA_GARCH <- ugarchfit(spec = spec_ARMA_GARCH, data = des_data)
+modele_AR_GARCH <- ugarchfit(spec = spec_AR_GARCH, data = des_data)
+
+show(modele_ARMA_ARCH)
+show(modele_ARMA_GARCH)
+show(modele_AR_ARCH)
+show(modele_AR_GARCH)
+
+infocriteria(modele_ARMA_ARCH)
+infocriteria(modele_ARMA_GARCH)
+infocriteria(modele_AR_ARCH)
+infocriteria(modele_AR_GARCH)
+```
+
+
 ```{r}
 # Prévisions 12 mois
 forecast_12 <- forecast(fit_auto, h = 12)
@@ -422,8 +624,8 @@ Backtest ?
 # Validation croisée temporelle
 # Garder les 12 derniers mois comme test
 n_test <- 12
-ts_train <- window(des_data, end = time(des_data)[length(ts_temp) - n_test])
-ts_test <- window(des_data, start = time(des_data)[length(ts_temp) - n_test + 1])
+ts_train <- window(des_data, end = time(des_data)[length(temperature) - n_test])
+ts_test <- window(des_data, start = time(des_data)[length(temperature) - n_test + 1])
 
 # Réestimer le modèle sur train
 fit_train <- auto.arima(ts_train, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
