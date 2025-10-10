@@ -77,13 +77,19 @@ aplatissement <- kurtosis(temperature, na.rm = TRUE)
 ```
 
 ```{r, echo = FALSE}
-cat("\nStatistiques descriptives de la série temporelle :\n")
-cat("------------------------------------------------\n")
-cat("Moyenne :", round(moyenne, 3), "\n")
-cat("Médiane :", round(mediane, 3), "\n")
-cat("Variance :", round(variance, 3), "\n")
-cat("Skewness :", round(skewness, 3), "\n")
-cat("Kurtosis :", round(kurtosis, 3), "\n")
+# D'abord, on crée un data.frame avec les statistiques
+stats_df <- data.frame(
+  Statistique = c("Moyenne", "Médiane", "Variance", "Skewness (asymétrie)", "Kurtosis (aplatissement)"),
+  Valeur = c(moyenne, mediane, variance, asymetrie, aplatissement)
+)
+
+# Ensuite, on utilise kable() pour créer un joli tableau
+# Le paramètre 'digits' permet d'arrondir joliment toutes les valeurs
+knitr::kable(
+  stats_df,
+  caption = "Statistiques descriptives de la série temporelle",
+  digits = 3
+)
 ```
 
 
@@ -146,22 +152,22 @@ ecart_type_par_mois
 ```{r, echo=FALSE}
 
 op <- par(mfrow = c(1,2))
-ro <- acf(ts_temp, lag=15, ylim = c(-1,1), main = "ACF empirique")
-alpha <- pacf(ts_temp, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
+ro <- acf(temperature, lag=15, ylim = c(-1,1), main = "ACF empirique")
+alpha <- pacf(temperature, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
 par(op)
 
 ```
-La série temporelle n'est pas stationnaire 
+
 ```{r, echo=FALSE}
 # Différenciation simple
-ts_diff1 <- diff(ts_temp, differences = 1)
+ts_diff1 <- diff(temperature, differences = 1)
 
 # Différenciation saisonnière
-ts_diff_seas <- diff(ts_temp, lag = 12)
+ts_diff_seas <- diff(temperature, lag = 12)
 
 # Tests sur séries différenciées
 par(mfrow = c(2, 2))
-plot(ts_temp, main = "Série Originale", ylab = "Température", col = "blue", lwd = 1.5)
+plot(temperature, main = "Série Originale", ylab = "Température", col = "blue", lwd = 1.5)
 plot(ts_diff1, main = "Différenciation d = 1", ylab = "Diff(Température)", col = "red", lwd = 1.5)
 abline(h = 0, lty = 2)
 plot(ts_diff_seas, main = "Différenciation Saisonnière (lag=12)", 
@@ -177,8 +183,10 @@ cat("\nTest ADF après différenciation (d=1) :\n")
 cat("p-value :", round(adf_diff$p.value, 4), "\n")
 ```
 La différentiationd'ordre 1 n'est pas satisfaisante. Regardons avec lag 12. 
+
+
 ```{r, echo=FALSE}
-des_data<- diff(ts_temp, lag=12)
+des_data<- diff(temperature, lag=12)
 plot(des_data, type='o', main = "Série désaisonnalisée par différenciation (lag 12)")
 mu <- mean(des_data)
 sig.des_data <- sd(des_data)
@@ -190,32 +198,59 @@ grid()
 ```
 
 ```{r, echo=FALSE}
-op <- par(mfrow = c(1,2))
-ro <- acf(des_data, lag=15, ylim = c(-1,1), main = "ACF empirique")
-alpha <- pacf(des_data, lag=15, ylim = c(-1,1), main = "et PACF", xlim=c(0,15))
-par(op)
-```
-8.Test de stationnarité
-```{r, echo=FALSE}
+par(mfrow = c(2,1))
 
+acf(des_data, lag.max = 36, xaxt = "n", main = "ACF")
+axis(1, at = 0:36/12, labels = 0:36)
+pacf(des_data, lag.max = 36, xaxt = "n", main = "PACF")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+
+
+```{r, echo=FALSE}
+# 1. EXÉCUTER LE TEST EN PREMIER (c'est l'étape la plus importante)
 adf_test <- adf.test(des_data, alternative = "stationary")
 
-print(adf_test)
-
-cat("\nINTERPRÉTATION :\n")
-cat("- H0 : la série n'est pas Stationnaire\n")
+# 2. PRÉPARER LA PARTIE CONDITIONNELLE DE L'INTERPRÉTATION
+#    On stocke le résultat du if/else dans une variable.
 if (adf_test$p.value > 0.05) {
-  cat("- p-value ≥ 0.05 → On NE REJETTE PAS H0\n")
-  cat("- ✗ La série n'est pas stationnaire\n\n")
+  interpretation_texte <- paste(
+    "- p-value ≥ 0.05 → On NE REJETTE PAS H0",
+    "- ✗ La série n'est pas stationnaire.",
+    sep = "\n"
+  )
 } else {
-  cat("- p-value < 0.05 → On REJETTE H0\n")
-  cat("- ✓ La série est stationnaire.\n")
+  interpretation_texte <- paste(
+    "- p-value < 0.05 → On REJETTE H0",
+    "- ✓ La série est stationnaire.",
+    sep = "\n"
+  )
 }
 
+# 3. ASSEMBLER LE TEXTE FINAL EN UTILISANT LA VARIABLE CRÉÉE
+texte_final <- paste(
+  "INTERPRÉTATION DU TEST ADF :",
+  "-----------------------------",
+  "- H0 : la série n'est pas Stationnaire",
+  interpretation_texte,
+  sep = "\n"
+)
+
+# 4. AFFICHER LES RÉSULTATS
+# D'abord le résultat brut du test
+print(adf_test)
+
+# Puis notre interprétation formatée
+cat("\n") # Ajoute une ligne vide pour séparer
+cat(texte_final)
+
 ```
+
 ```{r, echo=FALSE}
 # Test KPSS
+
 kpss_result <- kpss.test(des_data)
+
 cat("\nTest KPSS sur la série brute :\n")
 cat("-------------------------------\n")
 cat("Statistique KPSS :", round(kpss_result$statistic, 4), "\n")
@@ -227,6 +262,7 @@ if (kpss_result$p.value < 0.05) {
   cat("✓ La série est STATIONNAIRE (p ≥ 0.05)\n")
 }
 ```
+
 Partie 2 : Modélisation et analyse 
 ```{r}
 # Sélection automatique avec auto.arima
@@ -420,3 +456,4 @@ legend("topleft",
        lty = c(1, 1, 2),
        bty = "n")
 ```
+
