@@ -44,41 +44,35 @@ library(psych)
 
 ```{r, echo = FALSE}
 
-# Chargement des données (remplace "ton_fichier.csv" par le nom de ton fichier)
 data <- read.csv("data.csv", stringsAsFactors = FALSE)
 
-# Conversion de la température de Fahrenheit en Celsius
-data <- data %>%
-  mutate(TAVG = (TAVG..Degrees.Fahrenheit. - 32) / 1.8)
+#head(data)
+#str(data)
 
-# Conversion de la colonne "Date" en format Date pour M/J/AAAA
-data$Date <- as.Date(data$Date, format = "%m/%d/%Y")
+data$temp_C <- (data$TAVG..Degrees.Fahrenheit. - 32)/1.8
 
-# Extraction de l'année et du mois
-data <- data %>%
-  mutate(Year = year(Date),
-         Month = month(Date))
+#head(data[,c("TAVG..Degrees.Fahrenheit.","temp_C")])
 
-# Calcul de la moyenne mensuelle de TAVG
-data <- data %>%
-  group_by(Year, Month) %>%
-  summarise(TAVG = mean(TAVG, na.rm = TRUE),
-            .groups = "drop")
+data$Date <- as.Date(data$Date, format="%m/%d/%Y") #Convertir la colonne en objet Date
 
-# Affichage du résultat
-head(data)
+data_mensuelle <- data %>%
+  mutate (mois = floor_date(Date, "month")) %>%
+  group_by(mois) %>%
+  summarise(T_moy = mean(temp_C, na.rm = TRUE))
+
+head(data_mensuelle)
 
 ```
 
 ```{r, echo = FALSE}
-ts_temp<- ts(data$TAVG, start = 1, frequency = 12)
-ts_temp
-temp_values <- as.numeric(ts_temp)
-moyenne <- mean(temp_values, na.rm = TRUE)
-mediane <- median(temp_values, na.rm = TRUE)
-variance <- var(temp_values, na.rm = TRUE)
-skewness <- skewness(temp_values, na.rm = TRUE)
-kurtosis <- kurtosis(temp_values, na.rm = TRUE)
+
+temperature <- (ts(data_mensuelle$T_moy, start = c(1990,1), frequency = 12))
+moyenne <- mean(temperature, na.rm = TRUE)
+mediane <- median(temperature, na.rm = TRUE)
+variance <- var(temperature, , na.rm = TRUE)
+asymetrie <- skewness(temperature, na.rm = TRUE)
+aplatissement <- kurtosis(temperature, na.rm = TRUE)
+
 
 ```
 
@@ -94,28 +88,34 @@ cat("Kurtosis :", round(kurtosis, 3), "\n")
 
 
 ```{r, echo = FALSE}
-
-plot(ts_temp,
-     main = "Série Temporelle : Température Moyenne Mensuelle",
-     ylab = "Température (°C)",
+plot(temperature,
+     main = " Température moyenne mensuelle à Lyon",
      xlab = "Année",
-     col = "steelblue",
+     ylab = "Température (°C)",
+     col = "blue",
      lwd = 2)
-
-mu<- mean(ts_temp)
+grid()
+mu<- mean(temperature)
 
 abline(h = mu, col = "red", lty = 2, lwd = 2)
 legend("topleft", legend = "Moyenne", col = "red", lty = 2, lwd = 2, bty = "n")
 
-
 ```
-Forme sinusoïdale qui vient de la saisonnalité des températures. 
+
+#La série temporelle présente une moyenne d’environ 13,2°C et une médiane proche (12,6°C), ce qui suggère une distribution globalement symétrique. 
+#La variance (47,2) indique une dispersion modérée des valeurs autour de la moyenne, avec un écart-type d’environ 7°C. 
+#Le skewness proche de zéro (0,04) confirme l’absence d’asymétrie marquée, 
+#tandis que le kurtosis inférieur à 3 (1,79) traduit une distribution plus aplatie que la normale, avec moins de valeurs extrêmes.
+
+#La série présente une forte saisonnalité annuelle (été chaud, hiver froid), avec une amplitude assez stable (~20°C). 
+#On peut suspecter une tendance légèrement haussière des températures maximales récentes, mais ce n’est pas flagrant visuellement. 
+
 ```{r, echo=FALSE}
 # Extraire les mois (1 à 12)
-months <- cycle(ts_temp)
+months <- cycle(temperature)
 
 df <- data.frame(Month = factor(months, levels = 1:12, labels = month.abb),
-                 Temp = as.numeric(ts_temp))
+                 Temp = as.numeric(temperature))
 
 # Tracer les boxplots par mois
 ggplot(df, aes(x = Month, y = Temp)) +
@@ -125,7 +125,23 @@ ggplot(df, aes(x = Month, y = Temp)) +
        y = "Température (°C)") +
   theme_minimal()
 
+ecart_type_par_mois <- df %>%
+  group_by(Month) %>%
+  summarise(Ecart_Type_Temp = sd(Temp))
+
+# Création du graphique
+ggplot(data = ecart_type_par_mois, aes(x = Month, y = Ecart_Type_Temp)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Écart type mensuel des températures",
+    x = "Mois",
+    y = "Écart type des températures"
+  ) +
+  theme_minimal()
+
+ecart_type_par_mois
 ```
+#La volatilité dépend du mois étudié. Sur le graphe on voit l'hétéroscélasticité des températures, notament un écart type plus important pour le mois de Janvier avec un écart type de 1.876471°C ou Février avec 2.472963°c contre un écart type de température plus faible pour les mois de Mars ou Avril (1.350898°C resp. 1.497665°C) par exemple.
 
 ```{r, echo=FALSE}
 
@@ -163,13 +179,13 @@ cat("p-value :", round(adf_diff$p.value, 4), "\n")
 La différentiationd'ordre 1 n'est pas satisfaisante. Regardons avec lag 12. 
 ```{r, echo=FALSE}
 des_data<- diff(ts_temp, lag=12)
-plot(des_data, type='o', main = "série différenciée")
+plot(des_data, type='o', main = "Série désaisonnalisée par différenciation (lag 12)")
 mu <- mean(des_data)
 sig.des_data <- sd(des_data)
 abline(h=mu, col="red", lwd=2)
 abline(h=mu+2*sig.des_data, col="red", lwd=2,lty=2)
 abline(h=mu-2*sig.des_data, col="red", lwd=2,lty=2)
-
+grid()
 
 ```
 
