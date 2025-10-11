@@ -7,7 +7,7 @@ date: "2025-10-02"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
 
@@ -68,15 +68,15 @@ head(data_mensuelle)
 ```{r, echo = FALSE}
 
 temperature <- (ts(data_mensuelle$T_moy, start = c(1990,1), frequency = 12))
+len<- length(temperature)
 moyenne <- mean(temperature, na.rm = TRUE)
 mediane <- median(temperature, na.rm = TRUE)
 variance <- var(temperature, , na.rm = TRUE)
 asymetrie <- skewness(temperature, na.rm = TRUE)
 aplatissement <- kurtosis(temperature, na.rm = TRUE)
 
-
 ```
-
+Le nombre totale de mois observé est 427 entre Janvier 1990 et Juillet 2025. 
 ```{r, echo = FALSE}
 stats_df <- data.frame(
   Statistique = c("Moyenne", "Médiane", "Variance", "Skewness (asymétrie)", "Kurtosis (aplatissement)"),
@@ -375,6 +375,9 @@ print(AIC_ARMA)
 res_AR <- residuals(modele_AR)
 res_ARMA <- residuals(modele_ARMA)
 ```
+
+
+Les résidus ne peuvent pas être considéré comme des bruits blancs au vu du test de Ljung-Box avec des p_value égal à des 0 machine. On le voit avec le plot des ACF des 2 modèles qui montrent une corrélation au lag 12 (Le mois de l'année précedente). 
 ```{r}
 par(mfrow = c(2,1))
 
@@ -383,14 +386,204 @@ axis(1, at = 0:36/12, labels = 0:36)
 acf(res_ARMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
 axis(1, at = 0:36/12, labels = 0:36)
 
-Box.test(res_AR, lag=20, type="Ljung-Box")
-Box.test(res_ARMA, lag=20, type="Ljung-Box")
+Box.test(res_AR, lag=12, type="Ljung-Box")
+Box.test(res_ARMA, lag=12, type="Ljung-Box")
 
 hist(res_AR, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
 hist(res_ARMA, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
 
 ```
-Les résidus ne peuvent pas être considéré comme des bruits blancs au vu du test de Ljung-Box avec des p_value égal à des 0 machine. On le voit avec le plot des ACF des 2 modèles qui montrent une corrélation au lag 12 (Le mois de l'année précedente). 
+
+```{r}
+
+fixed_ar_36 <- c(NA, rep(0,10), NA, NA, rep(0,11),NA, rep(0,11), NA)  
+modele_subsetAR_36 <- Arima(des_data, order=c(37,0,0), include.mean=FALSE, fixed=fixed_ar_36)
+nb_param_AR_36<- coef(modele_subsetAR_36)
+
+
+fixed_ar_12 <- c(NA, rep(0,10), NA)  # φ1 et φ12 libres
+modele_subsetAR_12 <- Arima(des_data, order=c(12,0,0), include.mean=FALSE, fixed=fixed_ar_12)
+nb_param_AR_12<- coef(modele_subsetAR_12)
+
+fixed_arma <- c(NA, rep(0,10), NA,      # AR part : φ1 et φ12 libres
+                rep(0,11), NA)          # MA part : θ12 libre
+modele_subsetARMA <- Arima(des_data, order=c(12,0,12), include.mean=FALSE, fixed=fixed_arma)
+
+res_subsetAR_12 <- residuals(modele_subsetAR_12)
+res_subsetAR_36 <- residuals(modele_subsetAR_36)
+res_subsetARMA <- residuals(modele_subsetARMA)
+
+par(mfrow = c(2,1))
+
+acf(res_subsetAR_12, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(12) (subset{lags: 1, 12}")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_subsetAR_36, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(12) (subset{lags: 1, 11, 12, 24, 36}")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_subsetARMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(12,0,12) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(res_subsetAR_12, lag=12, type="Ljung-Box") # fitdf représente le nombre de paramètre estimé et permet dans ce cas d'ajuster le degré de liberté de la loi du qi 2 pour calculer la statistique de Ljung-Box.  
+Box.test(res_subsetAR_36, lag=12, type="Ljung-Box")
+Box.test(res_subsetAR_36, lag=25, type="Ljung-Box")
+Box.test(res_subsetARMA, lag=12, type="Ljung-Box")
+length(des_data)
+```
+
+## Test de Ljung–Box
+
+La statistique du test est donnée par :
+
+$$
+Q = n (n + 2) \sum_{k=1}^{m} \frac{\hat{\rho}(k)^2}{n - k}
+$$
+
+Sous l'hypothèse nulle \( H_0 \) d'absence d'autocorrélation,  
+on a :
+
+```{r, echo=FALSE}
+fixed_ar_36 <- c(NA, rep(0,10), NA, NA, rep(0,11),NA, rep(0,11), NA)  
+modele_subsetAR_36 <- Arima(des_data, order=c(37,0,0), include.mean=FALSE, fixed=fixed_ar_36)
+nb_param_AR_36 <- coef(modele_subsetAR_36)
+nb_param_AR_36
+
+fixed_ar_12 <- c(NA, rep(0,10), NA)
+modele_subsetAR_12 <- Arima(des_data, order=c(12,0,0), include.mean=FALSE, fixed=fixed_ar_12)
+nb_param_AR_12 <- coef(modele_subsetAR_12)
+nb_param_AR_12
+
+fixed_arma <- c(NA, rep(0,10), NA,      # AR part : φ1 et φ12 libres
+                rep(0,11), NA)          # MA part : θ12 libre
+modele_subsetARMA <- Arima(des_data, order=c(12,0,12), include.mean=FALSE, fixed=fixed_arma)
+
+# Calcul des résidus
+res_subsetAR_12 <- residuals(modele_subsetAR_12)
+res_subsetAR_36 <- residuals(modele_subsetAR_36)
+res_subsetARMA <- residuals(modele_subsetARMA)
+
+# Tests de Ljung-Box
+lb_AR12_lag12 <- Box.test(res_subsetAR_12, lag=12, type="Ljung-Box")
+lb_AR12_lag24 <- Box.test(res_subsetAR_12, lag=24, type="Ljung-Box")
+
+lb_AR36_lag12 <- Box.test(res_subsetAR_36, lag=12, type="Ljung-Box")
+lb_AR36_lag24 <- Box.test(res_subsetAR_36, lag=24, type="Ljung-Box")
+lb_AR36_lag36 <- Box.test(res_subsetAR_36, lag=36, type="Ljung-Box")
+
+lb_ARMA_lag12 <- Box.test(res_subsetARMA, lag=12, type="Ljung-Box")
+lb_ARMA_lag24 <- Box.test(res_subsetARMA, lag=24, type="Ljung-Box")
+lb_ARMA_lag12
+# Graphiques ACF avec statistiques
+par(mfrow = c(3,1), mar = c(4, 4, 4, 2))
+
+# AR(12) subset
+acf(res_subsetAR_12, lag.max = 36, xaxt = "n", 
+    main = "ACF des résidus AR(12) subset {lags: 1, 12}")
+axis(1, at = 0:36/12, labels = 0:36)
+
+
+# AR(36) subset
+acf(res_subsetAR_36, lag.max = 36, xaxt = "n", 
+    main = "ACF des résidus AR(37) subset {lags: 1, 12, 13, 24, 36}")
+axis(1, at = 0:36/12, labels = 0:36)
+
+
+# ARMA subset
+acf(res_subsetARMA, lag.max = 36, xaxt = "n", 
+    main = "ACF des résidus ARMA(12,0,12) subset {AR:1,12 ; MA:12}")
+axis(1, at = 0:36/12, labels = 0:36)
+
+
+# Graphiques des lois du Chi² séparés par ddl
+par(mfrow = c(3,2), mar = c(4, 4, 3, 2))
+
+x <- seq(0, 50, length.out = 500)
+
+# 1. Chi² avec ddl = 10 (AR12, lag=12)
+plot(x, dchisq(x, df = 12), type = "l", lwd = 2, col = "blue",
+     main = expression(paste(chi^2, "(ddl=10) - AR(12) lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR12_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(12)", 
+                  paste0("Q observé = ", round(lb_AR12_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR12_lag12$p.value, 4))),
+       col = c("blue", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 2. Chi² avec ddl = 22 (AR12, lag=24)
+plot(x, dchisq(x, df = 24), type = "l", lwd = 2, col = "blue",
+     main = expression(paste(chi^2, "(ddl=22) - AR(12) lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR12_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(22)", 
+                  paste0("Q observé = ", round(lb_AR12_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR12_lag24$p.value, 4))),
+       col = c("blue", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 3. Chi² avec ddl = 7 (AR36, lag=12)
+plot(x, dchisq(x, df = 12), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=7) - AR(37) lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(7)", 
+                  paste0("Q observé = ", round(lb_AR36_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag12$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 4. Chi² avec ddl = 19 (AR36, lag=24)
+plot(x, dchisq(x, df = 12), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=19) - AR(37) lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(19)", 
+                  paste0("Q observé = ", round(lb_AR36_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag24$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 5. Chi² avec ddl = 31 (AR36, lag=36)
+plot(x, dchisq(x, df = 36), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=31) - AR(37) lag=36")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag36$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(31)", 
+                  paste0("Q observé = ", round(lb_AR36_lag36$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag36$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 6. Chi² avec ddl = 9 (ARMA, lag=12)
+plot(x, dchisq(x, df = 12), type = "l", lwd = 2, col = "purple",
+     main = expression(paste(chi^2, "(ddl=9) - ARMA lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_ARMA_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(9)", 
+                  paste0("Q observé = ", round(lb_ARMA_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_ARMA_lag12$p.value, 4))),
+       col = c("purple", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# Graphique pour ARMA lag=24
+par(mfrow = c(1,1), mar = c(4, 4, 3, 2))
+plot(x, dchisq(x, df = 24), type = "l", lwd = 2, col = "purple",
+     main = expression(paste(chi^2, "(ddl=21) - ARMA lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_ARMA_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(21)", 
+                  paste0("Q observé = ", round(lb_ARMA_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_ARMA_lag24$p.value, 4))),
+       col = c("purple", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+```
+
+
 
 ```{r}
 modele_AR_1 <- arima(des_data, order = c(1,0,0), method="ML")
@@ -412,8 +605,8 @@ axis(1, at = 0:36/12, labels = 0:36)
 acf(res_MA_1, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
 axis(1, at = 0:36/12, labels = 0:36)
 
-Box.test(res_AR_1, lag=20, type="Ljung-Box")
-Box.test(res_MA_1, lag=20, type="Ljung-Box")
+Box.test(res_AR_1, lag=12, type="Ljung-Box")
+Box.test(res_MA_1, lag=12, type="Ljung-Box")
 
 hist(res_AR_1, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
 hist(res_MA_1, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
@@ -484,7 +677,7 @@ cat("\n--- Tests Complémentaires sur les Résidus ---\n\n")
 
 # Test de Ljung-Box
 residus <- residuals(fit_auto)
-ljung_box <- Box.test(residus, lag = 20, type = "Ljung-Box")
+ljung_box <- Box.test(residus, lag = 12, type = "Ljung-Box", fitdf = 5)
 cat("Test de Ljung-Box (H0 : pas d'autocorrélation) :\n")
 cat("  p-value =", round(ljung_box$p.value, 4), "\n")
 if (ljung_box$p.value > 0.05) {
@@ -529,51 +722,7 @@ qqline(residus, col = "red", lwd = 2)
 plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple", type = "h")
 abline(h = mean(residus^2), col = "red", lty = 2)
 ```
-```{r}
 
-ArchTest(res_AR, lags=10)
-ArchTest(residus, lags=10)
-
-spec_ARMA_ARCH <- ugarchspec(
-  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
-  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
-  distribution.model = "norm"
-)
-
-spec_AR_ARCH <- ugarchspec(
-  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
-  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
-  distribution.model = "std"
-)
-
-modele_ARMA_ARCH <- ugarchfit(spec = spec_ARMA_ARCH, data = des_data)
-modele_AR_ARCH <- ugarchfit(spec = spec_AR_ARCH, data = des_data)
-
-spec_ARMA_GARCH <- ugarchspec(
-  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
-  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
-  distribution.model = "norm"
-)
-
-spec_AR_GARCH <- ugarchspec(
-  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
-  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
-  distribution.model = "std"
-)
-
-modele_ARMA_GARCH <- ugarchfit(spec = spec_ARMA_GARCH, data = des_data)
-modele_AR_GARCH <- ugarchfit(spec = spec_AR_GARCH, data = des_data)
-
-show(modele_ARMA_ARCH)
-show(modele_ARMA_GARCH)
-show(modele_AR_ARCH)
-show(modele_AR_GARCH)
-
-infocriteria(modele_ARMA_ARCH)
-infocriteria(modele_ARMA_GARCH)
-infocriteria(modele_AR_ARCH)
-infocriteria(modele_AR_GARCH)
-```
 
 
 ```{r}
@@ -618,44 +767,5 @@ plot(forecast_24,
      lwd = 2,
      shadecols = c("lightblue", "lightgray"))
 ```
-A 24 moi il y des problèmes !! il faut garder h = 12
-Backtest ? 
-```{r}
-# Validation croisée temporelle
-# Garder les 12 derniers mois comme test
-n_test <- 12
-ts_train <- window(des_data, end = time(des_data)[length(temperature) - n_test])
-ts_test <- window(des_data, start = time(des_data)[length(temperature) - n_test + 1])
 
-# Réestimer le modèle sur train
-fit_train <- auto.arima(ts_train, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
-
-# Prévisions
-forecast_test <- forecast(fit_train, h = n_test)
-
-# Calculer les erreurs
-errors <- ts_test - forecast_test$mean
-mae <- mean(abs(errors))
-rmse <- sqrt(mean(errors^2))
-mape <- mean(abs(errors / ts_test)) * 100
-
-cat("Métriques de Performance (Backtesting) :\n")
-cat("----------------------------------------\n")
-cat("MAE  (Mean Absolute Error)       :", round(mae, 4), "°C\n")
-cat("RMSE (Root Mean Squared Error)   :", round(rmse, 4), "°C\n")
-cat("MAPE (Mean Absolute Percentage Error) :", round(mape, 2), "%\n")
-
-# Visualisation
-plot(des_data, main = "Validation Croisée : Prévisions vs Réalisations",
-     ylab = "Température (°C)", col = "black", lwd = 1.5)
-lines(forecast_test$mean, col = "red", lwd = 2)
-lines(forecast_test$lower[, 2], col = "blue", lty = 2)
-lines(forecast_test$upper[, 2], col = "blue", lty = 2)
-legend("topleft",
-       legend = c("Observé", "Prévision", "IC 95%"),
-       col = c("black", "red", "blue"),
-       lwd = c(1.5, 2, 1),
-       lty = c(1, 1, 2),
-       bty = "n")
-```
 
