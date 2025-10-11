@@ -635,7 +635,7 @@ models <- list(
   "ARIMA(1,1,1)(1,1,1)[12]" = Arima(des_data, order = c(1,0,1), seasonal = c(1,1,1)),
   "ARIMA(2,1,2)(1,1,1)[12]" = Arima(des_data, order = c(2,0,2), seasonal = c(1,1,1)),
   "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,0,2), seasonal = c(2,1,1)),
-  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,0,2), seasonal = c(2,1,1))
+  "ARIMA(2,0,2)(2,0,0)[12]" = Arima(des_data, order = c(2,0,2), seasonal = c(2,0,0))
 )
 
 # Comparaison des critères
@@ -669,13 +669,8 @@ cat("\n✓ Le meilleur modèle selon AICc est :", comparison$Modèle[1], "\n")
 ```
 
 ```{r}
-# Utiliser le modèle auto.arima
 checkresiduals(fit_auto)
 
-# Tests supplémentaires
-cat("\n--- Tests Complémentaires sur les Résidus ---\n\n")
-
-# Test de Ljung-Box
 residus <- residuals(fit_auto)
 ljung_box <- Box.test(residus, lag = 12, type = "Ljung-Box", fitdf = 5)
 cat("Test de Ljung-Box (H0 : pas d'autocorrélation) :\n")
