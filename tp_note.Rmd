@@ -31,6 +31,16 @@ if (!require("TSstudio")) install.packages("TSstudio")
 if (!require("moments")) install.packages("moments")
 if (!require("psych")) install.packages("psych")
 
+install.packages("FinTS")
+install.packages("rugarch")
+install.packages("Metrics")
+
+
+library (tseries)
+library(FinTS)
+library(rugarch)
+library(Metrics)
+library(forecast)
 library(dplyr)
 library(tidyr)
 library(lubridate)
@@ -40,6 +50,7 @@ library(ggplot2)
 library(gridExtra)
 library(moments)
 library(psych)
+
 
 ```
 
@@ -443,23 +454,26 @@ on a :
 ```{r, echo=FALSE}
 fixed_ar_36 <- c(NA, rep(0,10), NA, NA, rep(0,11),NA, rep(0,11), NA)  
 modele_subsetAR_36 <- Arima(des_data, order=c(37,0,0), include.mean=FALSE, fixed=fixed_ar_36)
-nb_param_AR_36 <- coef(modele_subsetAR_36)
-nb_param_AR_36
 
 fixed_ar_12 <- c(NA, rep(0,10), NA)
 modele_subsetAR_12 <- Arima(des_data, order=c(12,0,0), include.mean=FALSE, fixed=fixed_ar_12)
-nb_param_AR_12 <- coef(modele_subsetAR_12)
-nb_param_AR_12
+
 
 fixed_arma <- c(NA, rep(0,10), NA,      # AR part : φ1 et φ12 libres
                 rep(0,11), NA)          # MA part : θ12 libre
 modele_subsetARMA <- Arima(des_data, order=c(12,0,12), include.mean=FALSE, fixed=fixed_arma)
+```
 
+
+```{r, echo=FALSE}
 # Calcul des résidus
 res_subsetAR_12 <- residuals(modele_subsetAR_12)
 res_subsetAR_36 <- residuals(modele_subsetAR_36)
 res_subsetARMA <- residuals(modele_subsetARMA)
+```
 
+
+```{r, echo=FALSE}
 # Tests de Ljung-Box
 lb_AR12_lag12 <- Box.test(res_subsetAR_12, lag=12, type="Ljung-Box")
 lb_AR12_lag24 <- Box.test(res_subsetAR_12, lag=24, type="Ljung-Box")
@@ -470,7 +484,11 @@ lb_AR36_lag36 <- Box.test(res_subsetAR_36, lag=36, type="Ljung-Box")
 
 lb_ARMA_lag12 <- Box.test(res_subsetARMA, lag=12, type="Ljung-Box")
 lb_ARMA_lag24 <- Box.test(res_subsetARMA, lag=24, type="Ljung-Box")
-lb_ARMA_lag12
+
+```
+
+
+```{r, echo=FALSE}
 # Graphiques ACF avec statistiques
 par(mfrow = c(3,1), mar = c(4, 4, 4, 2))
 
@@ -490,8 +508,10 @@ axis(1, at = 0:36/12, labels = 0:36)
 acf(res_subsetARMA, lag.max = 36, xaxt = "n", 
     main = "ACF des résidus ARMA(12,0,12) subset {AR:1,12 ; MA:12}")
 axis(1, at = 0:36/12, labels = 0:36)
+```
 
 
+```{r, echo=FALSE}
 # Graphiques des lois du Chi² séparés par ddl
 par(mfrow = c(3,2), mar = c(4, 4, 3, 2))
 
@@ -590,8 +610,6 @@ modele_AR_1 <- arima(des_data, order = c(1,0,0), method="ML")
 modele_MA_1 <- arima(des_data, order = c(0,0,1), method="ML")
 AIC_AR_1 = AIC(modele_AR_1)
 AIC_MA_1 = AIC(modele_MA_1)
-print(AIC_AR_1)
-print(AIC_MA_1)
 
 res_AR_1 <- residuals(modele_AR_1)
 res_MA_1 <- residuals(modele_MA_1)
@@ -600,18 +618,18 @@ res_MA_1 <- residuals(modele_MA_1)
 ```{r}
 par(mfrow = c(2,1))
 
-acf(res_AR_1, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(4)")
+acf(res_AR_1, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(1)")
 axis(1, at = 0:36/12, labels = 0:36)
-acf(res_MA_1, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
+acf(res_MA_1, lag.max = 36, xaxt = "n", main = "ACF des résidus MA(1)")
 axis(1, at = 0:36/12, labels = 0:36)
 
 Box.test(res_AR_1, lag=12, type="Ljung-Box")
 Box.test(res_MA_1, lag=12, type="Ljung-Box")
 
-hist(res_AR_1, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
-hist(res_MA_1, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
+hist(res_AR_1, main = "Histogramme des résidus AR(1)", xlab = "Résidus")
+hist(res_MA_1, main = "Histogramme des résidus MA(1)", xlab = "Résidus")
 ```
-Pas non plus de Ljung-Box
+
 
 ```{r, echo=FALSE}
 # Sélection automatique avec auto.arima
@@ -691,6 +709,9 @@ if (shapiro_test$p.value > 0.05) {
   cat("  ✗ Les résidus ne suivent pas une loi normale (p < 0.05)\n\n")
 }
 ```
+Les modèles qui ont passé la test de Box-Ljung sont les modèles ARIMA(1,0,1)(2,0,1)[12], ARMA(12,0,12) subset {AR:1,12 ; MA:12} équivalent à ARIMA(1,0,0)(1,0,1)[12]
+
+3. Analyse des résidus
 ```{r}
 # Analyse détaillée des résidus
 par(mfrow = c(2, 3))
@@ -717,6 +738,14 @@ qqline(residus, col = "red", lwd = 2)
 plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple", type = "h")
 abline(h = mean(residus^2), col = "red", lty = 2)
 ```
+```{r}
+library(FinTS)
+
+# Test ARCH d’Engle
+ArchTest(residus, lags = 12)
+
+```
+
 
 ```{r}
 
@@ -726,12 +755,13 @@ abline(h = mean(residus^2), col = "red", lty = 2)
 ArchTest(res_AR, lags=14)
 ArchTest(res_ARMA, lags=14)
 
+#ARCH pour le modèle ARMA(5,0,5)
 spec_ARMA_ARCH <- ugarchspec(
   variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
   mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
   distribution.model = "norm"
 )
-
+#ARCH pour le modèle AR(4) ?
 spec_AR_ARCH <- ugarchspec(
   variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
   mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
@@ -741,6 +771,7 @@ spec_AR_ARCH <- ugarchspec(
 modele_ARMA_ARCH <- ugarchfit(spec = spec_ARMA_ARCH, data = des_data)
 modele_AR_ARCH <- ugarchfit(spec = spec_AR_ARCH, data = des_data)
 
+#GARCH
 spec_ARMA_GARCH <- ugarchspec(
   variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
   mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
