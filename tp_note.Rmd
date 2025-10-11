@@ -723,6 +723,412 @@ plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple"
 abline(h = mean(residus^2), col = "red", lty = 2)
 ```
 
+```{r}
+
+
+## Modèles ARCH et GARCH
+
+ArchTest(res_AR, lags=14)
+ArchTest(res_ARMA, lags=14)
+
+spec_ARMA_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
+  distribution.model = "norm"
+)
+
+spec_AR_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
+  distribution.model = "std"
+)
+
+modele_ARMA_ARCH <- ugarchfit(spec = spec_ARMA_ARCH, data = des_data)
+modele_AR_ARCH <- ugarchfit(spec = spec_AR_ARCH, data = des_data)
+
+spec_ARMA_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(5,5), include.mean = TRUE),
+  distribution.model = "norm"
+)
+
+spec_AR_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(4,0), include.mean = TRUE),
+  distribution.model = "std"
+)
+
+modele_ARMA_GARCH <- ugarchfit(spec = spec_ARMA_GARCH, data = des_data)
+modele_AR_GARCH <- ugarchfit(spec = spec_AR_GARCH, data = des_data)
+
+show(modele_ARMA_ARCH)
+show(modele_ARMA_GARCH)
+show(modele_AR_ARCH)
+show(modele_AR_GARCH)
+
+infocriteria(modele_ARMA_ARCH)
+infocriteria(modele_ARMA_GARCH)
+infocriteria(modele_AR_ARCH)
+infocriteria(modele_AR_GARCH)
+
+z_ARMA_GARCH <- residuals(modele_ARMA_GARCH, standardize = TRUE)
+mean(z_ARMA_GARCH)
+var(z_ARMA_GARCH)
+
+acf(z_ARMA_GARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés ARMA(5,5) GARCH(1,1)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_ARMA_GARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré ARMA(5,5) GARCH(1,1)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(z_ARMA_GARCH,  lag=20, type="Ljung-Box")
+Box.test(z_ARMA_GARCH^2,lag=20, type="Ljung-Box")    
+
+z_AR_GARCH <- residuals(modele_AR_GARCH, standardize = TRUE)
+mean(z_AR_GARCH)
+var(z_AR_GARCH)
+
+acf(z_AR_GARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés AR(4) GARCH(1,1)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_AR_GARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré AR(4) GARCH(1,1)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(z_AR_GARCH,  lag=20, type="Ljung-Box")
+Box.test(z_AR_GARCH^2,lag=20, type="Ljung-Box")    
+
+z_AR_ARCH <- residuals(modele_AR_ARCH, standardize = TRUE)
+mean(z_AR_ARCH)
+var(z_AR_ARCH)
+
+acf(z_AR_ARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés AR(4) ARCH(1)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_AR_ARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré AR(4) ARCH(1)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(z_AR_ARCH,  lag=20, type="Ljung-Box")
+Box.test(z_AR_ARCH^2,lag=20, type="Ljung-Box") 
+
+
+ArchTest(res_subsetARMA, lags=14)
+
+spec_subsetARMA_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model     = list(armaOrder = c(12,12), include.mean = TRUE),
+  distribution.model = "norm",
+  fixed.pars = list(
+    # AR coefficients forcés à 0 sauf φ1 et φ12
+    ar2=0, ar3=0, ar4=0, ar5=0, ar6=0, ar7=0, ar8=0, ar9=0, ar10=0, ar11=0,
+    # MA coefficients forcés à 0 sauf θ12
+    ma1=0, ma2=0, ma3=0, ma4=0, ma5=0, ma6=0, ma7=0, ma8=0, ma9=0, ma10=0, ma11=0
+  )
+)
+
+spec_subsetARMA_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model     = list(armaOrder = c(12,12), include.mean = TRUE),
+  distribution.model = "norm",
+  fixed.pars = list(
+    ar2=0, ar3=0, ar4=0, ar5=0, ar6=0, ar7=0, ar8=0, ar9=0, ar10=0, ar11=0,
+    ma1=0, ma2=0, ma3=0, ma4=0, ma5=0, ma6=0, ma7=0, ma8=0, ma9=0, ma10=0, ma11=0
+  )
+)
+
+modele_subsetARMA_ARCH <- ugarchfit(spec = spec_subsetARMA_ARCH, data = des_data)
+modele_subsetARMA_GARCH <- ugarchfit(spec = spec_subsetARMA_GARCH, data = des_data)
+
+show(modele_subsetARMA_ARCH)
+show(modele_subsetARMA_GARCH)
+infocriteria(modele_subsetARMA_ARCH)
+infocriteria(modele_subsetARMA_GARCH)
+
+z_subsetARMA_GARCH <- residuals(modele_subsetARMA_GARCH, standardize = TRUE)
+mean(z_subsetARMA_GARCH)
+var(z_subsetARMA_GARCH)
+
+acf(z_subsetARMA_GARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés ARMA(12,12) GARCH(1,1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_subsetARMA_GARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré ARMA(12,12) GARCH(1,1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(z_subsetARMA_GARCH,  lag=20, type="Ljung-Box")
+Box.test(z_subsetARMA_GARCH^2,lag=20, type="Ljung-Box")  
+
+```
+
+4. Partie Prévision
+```{r}
+
+horizon <- 12
+n <- length(des_data)
+
+train <- window(des_data, end = time(des_data)[n-horizon])
+test <- window(des_data, start = time(des_data)[n-horizon+1])
+
+modele_prev_ARMA_GARCH <- ugarchfit(spec = spec_ARMA_GARCH, data = train)
+prev <- ugarchforecast(modele_prev_ARMA_GARCH, n.ahead=horizon)
+
+alpha <- 0.05
+z <- qnorm(1-alpha/2)
+
+prev_moy <- as.numeric(fitted(prev))
+prev_sigma <- as.numeric(sigma(prev))
+ic_sup <- prev_moy + z*prev_sigma
+ic_inf <- prev_moy - z*prev_sigma
+
+start_prev <- tsp(train)[2] + 1/frequency(train)
+prev_ts <- ts(prev_moy, frequency=12,
+             start = start_prev)
+ic_sup_ts <- ts(ic_sup, frequency=12, start = start_prev)
+ic_inf_ts <- ts(ic_inf, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(5,5)-GARCH(1,1) avec IC à 95%")
+lines(prev_ts, col="blue", lwd=2)
+lines(ic_inf_ts, col="red", lty=2)
+lines(ic_sup_ts, col="red", lty=2)
+
+
+des_data_zoom <- window(des_data, start = c(2020, 1))
+
+ylim_vals_ARMA_GARCH <- range(des_data_zoom,
+                        prev_ts,
+                        ic_inf_ts,
+                        ic_sup_ts,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(5,5)-GARCH(1,1) avec IC à 95%", ylim=ylim_vals_ARMA_GARCH)
+lines(prev_ts, col="blue")
+lines(ic_inf_ts, col="red", lty=2)
+lines(ic_sup_ts, col="red", lty=2)
+
+mse <- mse(as.numeric(test), prev_moy)
+mae <- mae(as.numeric(test), prev_moy)
+
+cat("MSE : ", mse, "\n",
+    "MAE : ", mae)
+
+modele_prev_subsetARMA_GARCH <- ugarchfit(spec = spec_subsetARMA_GARCH, data = train)
+prev_subsetARMA_GARCH <- ugarchforecast(modele_prev_subsetARMA_GARCH, n.ahead=horizon)
+
+prev_subsetARMA_GARCH_moy <- as.numeric(fitted(prev_subsetARMA_GARCH))
+prev_subsetARMA_GARCH_sigma <- as.numeric(sigma(prev_subsetARMA_GARCH))
+ic_sup_subsetARMA_GARCH <- prev_subsetARMA_GARCH_moy + z*prev_subsetARMA_GARCH_sigma
+ic_inf_subsetARMA_GARCH <- prev_subsetARMA_GARCH_moy - z*prev_subsetARMA_GARCH_sigma
+
+prev_subsetARMA_GARCH_ts <- ts(prev_subsetARMA_GARCH_moy, frequency=12,
+              start = start_prev)
+ic_sup_subsetARMA_GARCH_ts <- ts(ic_sup_subsetARMA_GARCH, frequency=12, start = start_prev)
+ic_inf_subsetARMA_GARCH_ts <- ts(ic_inf_subsetARMA_GARCH, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(5,5)-GARCH(1,1) avec IC à 95%")
+lines(prev_subsetARMA_GARCH_ts, col="blue", lwd=2)
+lines(ic_inf_subsetARMA_GARCH_ts, col="red", lty=2)
+lines(ic_sup_subsetARMA_GARCH_ts, col="red", lty=2)
+
+
+des_data_zoom <- window(des_data, start = c(2020, 1))
+
+ylim_vals_subsetARMA_GARCH <- range(des_data_zoom,
+                              prev_subsetARMA_GARCH_ts,
+                              ic_inf_subsetARMA_GARCH_ts,
+                              ic_sup_subsetARMA_GARCH_ts,
+                              na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(5,5)-GARCH(1,1) avec IC à 95%", ylim=ylim_vals_subsetARMA_GARCH)
+lines(prev_subsetARMA_GARCH_ts, col="blue")
+lines(ic_inf_subsetARMA_GARCH_ts, col="red", lty=2)
+lines(ic_sup_subsetARMA_GARCH_ts, col="red", lty=2)
+
+mse_subsetARMA_GARCH <- mse(as.numeric(test), prev_subsetARMA_GARCH_moy)
+mae_subsetARMA_GARCH <- mae(as.numeric(test), prev_subsetARMA_GARCH_moy)
+
+cat("MSE : ", mse_subsetARMA_GARCH, "\n",
+    "MAE : ", mae_subsetARMA_GARCH)
+
+resultats_prev_ARMA <- data.frame(
+  p = integer(),
+  q = integer(),
+  AIC = numeric(),
+  BIC = numeric()
+)
+
+for (p in 0:5){
+  for (q in 0:5){
+    if (p==0 & q==0) next
+    
+    fit <- tryCatch({
+      arima(train, order = c(p,0,q), method="ML")
+    }, error = function(e) NULL)
+    
+    if (!is.null(fit)){
+      resultats_prev_ARMA <- rbind(resultats_ARMA, data.frame(
+        p = p,
+        q = q,
+        AIC = AIC(fit),
+        BIC = BIC(fit)
+      ))
+    }
+  }
+}
+
+print(resultats_prev_ARMA)
+
+meilleur_AIC_prev_ARMA <- resultats_prev_ARMA[which.min(resultats_prev_ARMA$AIC),]
+meilleur_BIC_prev_ARMA <- resultats_prev_ARMA[which.min(resultats_prev_ARMA$BIC),]
+
+cat("Meilleur modèle de prévision pour ARMA selon AIC: ARMA(",meilleur_AIC_prev_ARMA$p, "0",meilleur_AIC_prev_ARMA$q, ")\n",
+    "Meilleur modèle de prévision pour ARMA selon BIC: ARMA(",meilleur_BIC_prev_ARMA$p, "0",meilleur_BIC_prev_ARMA$q, ")" 
+)
+
+modele_prev_ARMA <- arima(train, order = c(5,0,5), method="ML")
+prev_ARMA <- forecast(modele_prev_ARMA, h=horizon, level=95)
+
+prev_moy_ARMA <- as.numeric(prev_ARMA$mean)
+ic_inf_ARMA <- as.numeric(prev_ARMA$lower)
+ic_sup_ARMA <- as.numeric(prev_ARMA$upper)
+
+prev_ts_ARMA <- ts(prev_moy_ARMA, frequency=12,
+              start = start_prev)
+ic_sup_ts_ARMA <- ts(ic_sup_ARMA, frequency=12, start = start_prev)
+ic_inf_ts_ARMA <- ts(ic_inf_ARMA, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(5,5) avec IC à 95%")
+lines(prev_ts_ARMA, col="blue", lwd=2)
+lines(ic_inf_ts_ARMA, col="red", lty=2)
+lines(ic_sup_ts_ARMA, col="red", lty=2)
+
+ylim_vals_ARMA <- range(des_data_zoom,
+                     prev_ts_ARMA,
+                     ic_inf_ts_ARMA,
+                     ic_sup_ts_ARMA,
+                   na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(5,5) avec IC à 95%", ylim=ylim_vals_ARMA)
+lines(prev_ts_ARMA, col="blue")
+lines(ic_inf_ts_ARMA, col="red", lty=2)
+lines(ic_sup_ts_ARMA, col="red", lty=2)
+
+mse_ARMA <- mse(as.numeric(test), prev_moy_ARMA)
+mae_ARMA <- mae(as.numeric(test), prev_moy_ARMA)
+
+cat("MSE : ", mse_ARMA, "\n",
+    "MAE : ", mae_ARMA)
+
+
+prev_subsetARMA <- forecast(modele_subsetARMA, h=horizon, level=95)
+
+prev_moy_subsetARMA <- as.numeric(prev_subsetARMA$mean)
+ic_inf_subsetARMA <- as.numeric(prev_subsetARMA$lower)
+ic_sup_subsetARMA <- as.numeric(prev_subsetARMA$upper)
+
+prev_ts_subsetARMA <- ts(prev_moy_subsetARMA, frequency=12,
+                   start = start_prev)
+ic_sup_ts_subsetARMA <- ts(ic_sup_subsetARMA, frequency=12, start = start_prev)
+ic_inf_ts_subsetARMA <- ts(ic_inf_subsetARMA, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(5,5) avec IC à 95%")
+lines(prev_ts_subsetARMA, col="blue", lwd=2)
+lines(ic_inf_ts_subsetARMA, col="red", lty=2)
+lines(ic_sup_ts_subsetARMA, col="red", lty=2)
+
+ylim_vals_subsetARMA <- range(des_data_zoom,
+                        prev_ts_subsetARMA,
+                        ic_inf_ts_subsetARMA,
+                        ic_sup_ts_subsetARMA,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(5,5) avec IC à 95%", ylim=ylim_vals_subsetARMA)
+lines(prev_ts_subsetARMA, col="blue")
+lines(ic_inf_ts_subsetARMA, col="red", lty=2)
+lines(ic_sup_ts_subsetARMA, col="red", lty=2)
+
+mse_subsetARMA <- mse(as.numeric(test), prev_moy_subsetARMA)
+mae_subsetARMA <- mae(as.numeric(test), prev_moy_subsetARMA)
+
+cat("MSE : ", mse_subsetARMA, "\n",
+    "MAE : ", mae_subsetARMA)
+
+
+
+# Méthode auto arima
+
+mod_auto <- auto.arima(des_data)
+summary(mod_auto)
+
+modele_SARIMA <- Arima(des_data, 
+                       order = c(2,0,2),
+                       seasonal = c(2,0,0))
+
+res_SARIMA <- residuals(modele_SARIMA)
+
+par(mfrow = c(2,1))
+
+acf(res_SARIMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARIMA(2,0,2)(2,0,0)[12]")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(res_SARIMA, lag=20, type="Ljung-Box")
+
+hist(res_SARIMA, main = "Histogramme des résidus ARIMA(2,0,2)(2,0,0)[12]", xlab = "Résidus")
+
+ArchTest(res_SARIMA, lags=10)
+
+modele_prev_SARIMA <- arima(train, 
+                            order = c(2,0,2), 
+                            seasonal = list(order = c(2,0,0), period = 2), 
+                            method="ML")
+prev_SARIMA <- forecast(modele_prev_SARIMA, h=horizon, level=95)
+
+prev_moy_SARIMA <- as.numeric(prev_SARIMA$mean)
+ic_inf_SARIMA <- as.numeric(prev_SARIMA$lower)
+ic_sup_SARIMA <- as.numeric(prev_SARIMA$upper)
+
+prev_ts_SARIMA <- ts(prev_moy_SARIMA, frequency=12,
+                   start = start_prev)
+ic_sup_ts_SARIMA <- ts(ic_sup_SARIMA, frequency=12, start = start_prev)
+ic_inf_ts_SARIMA <- ts(ic_inf_SARIMA, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARIMA(2,0,2)(2,0,0)[12] avec IC à 95%")
+lines(prev_ts_SARIMA, col="blue", lwd=2)
+lines(ic_inf_ts_SARIMA, col="red", lty=2)
+lines(ic_sup_ts_SARIMA, col="red", lty=2)
+
+ylim_vals_SARIMA <- range(des_data_zoom,
+                        prev_ts_SARIMA,
+                        ic_inf_ts_SARIMA,
+                        ic_sup_ts_SARIMA,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions AARIMA(2,0,2)(2,0,0)[12] avec IC à 95%", ylim=ylim_vals_ARMA)
+lines(prev_ts_SARIMA, col="blue")
+lines(ic_inf_ts_SARIMA, col="red", lty=2)
+lines(ic_sup_ts_SARIMA, col="red", lty=2)
+
+mse_SARIMA <- mse(as.numeric(test), prev_moy_SARIMA)
+mae_SARIMA <- mae(as.numeric(test), prev_moy_SARIMA)
+
+cat("MSE : ", mse_SARIMA, "\n",
+    "MAE : ", mae_SARIMA)
+
+
+performances <- data.frame(
+  Model = c("ARMA", "ARMA-GARCH","SARIMA","subset ARMA-GARCH","subset ARMA"),
+  MSE   = c(mse_ARMA,
+            mse,
+            mse_SARIMA,
+            mse_subsetARMA_GARCH,
+            mse_subsetARMA),
+  MAE   = c(mae_ARMA,
+            mae,
+            mae_SARIMA,
+            mae_subsetARMA_GARCH,
+            mae_subsetARMA)
+)
+print(performances) 
+
+```
 
 
 ```{r}
