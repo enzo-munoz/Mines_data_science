@@ -777,7 +777,6 @@ ArchTest(res_subsetARMA, lags=12)
 ```
 Le test ARCH d'Engle appliqué aux résidus de l'ARIMA(1,0,0)(1,0,1)[12] (p-value = 0,216) et de l'ARMA(12,0,12) subset{AR:1,2 ; MA:12} (p-value > 0,05) n'est pas significatif. Nous ne mettons donc pas en évidence d'hétéroscédastiscité conditionnelle. Conformément aux consignes, nous estimons tout de même un ARCH(1) puis un GARCH(1,1).
 
-2. Modèle ARCH(1) & GARCH(1,1)
 ```{r}
 
 spec_subsetARMA_ARCH <- ugarchspec(
