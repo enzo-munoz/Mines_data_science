@@ -779,7 +779,394 @@ performances <- data.frame(
 )
 print(performances)
 
+## Bonus
 
+packages <- c("quantmod", "tseries", "forecast", "rugarch", "FinTS", 
+              "dplyr", "tidyr", "lubridate", "ggplot2", "gridExtra", 
+              "moments", "psych", "knitr", "kableExtra")
+
+for (pkg in packages) {
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    install.packages(pkg, quiet = TRUE)
+    library(pkg, character.only = TRUE, quietly = TRUE)
+  }
+}
+
+ticker <- "EURUSD=X"
+getSymbols(ticker, src = "yahoo", from = "2022-01-01", to = "2024-12-31", auto.assign = TRUE)
+
+close_prices <- Cl(get(ticker))
+log_returns <- diff(log(close_prices))
+log_returns <- na.omit(log_returns)
+
+stats_desc <- data.frame(
+  Statistique = c("Nombre d'observations", "Moyenne", "Écart-type", "Minimum", 
+                  "Maximum", "Skewness", "Kurtosis"),
+  Valeur = c(
+    length(log_returns),
+    round(mean(log_returns), 6),
+    round(sd(log_returns), 6),
+    round(min(log_returns), 6),
+    round(max(log_returns), 6),
+    round(moments::skewness(as.numeric(log_returns)), 4),
+    round(moments::kurtosis(as.numeric(log_returns)), 4)
+  )
+)
+
+kable(stats_desc, caption = "Statistiques Descriptives des Rendements Logarithmiques") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+plot(close_prices, main = "EUR/USD - Prix de Clôture", ylab = "Taux de Change", col = "darkblue", lwd = 1.5)
+plot(log_returns, main = "Rendements Logarithmiques", ylab = "Rendements", col = "steelblue", type = "h")
+plot(log_returns^2, main = "Rendements² (Proxy Volatilité)", ylab = "Rendements²", col = "red3", type = "h")
+hist(log_returns, breaks = 50, main = "Distribution des Rendements", 
+     xlab = "Rendements", col = "lightblue", border = "white", probability = TRUE)
+lines(density(log_returns), col = "red", lwd = 2)
+
+adf_result <- adf.test(log_returns)
+kpss_result <- kpss.test(log_returns)
+
+tests_stationnarite <- data.frame(
+  Test = c("Augmented Dickey-Fuller", "KPSS"),
+  Statistique = c(round(adf_result$statistic, 4), round(kpss_result$statistic, 4)),
+  `P-value` = c(round(adf_result$p.value, 4), round(kpss_result$p.value, 4)),
+  Conclusion = c(
+    ifelse(adf_result$p.value < 0.05, "✓ Stationnaire", "✗ Non-stationnaire"),
+    ifelse(kpss_result$p.value >= 0.05, "✓ Stationnaire", "✗ Non-stationnaire")
+  )
+)
+
+kable(tests_stationnarite, caption = "Tests de Stationnarité") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Initialisation
+serie_courante <- log_returns
+max_iterations <- 50
+convergence <- FALSE
+iteration <- 0
+
+# Stockage des résultats
+historique_iterations <- data.frame()
+modeles_estimes <- list()
+
+cat("\n## Journal des Itérations\n\n")
+cat("**Principe** : À chaque itération, on teste si les résidus nécessitent un nouveau cycle ARIMA-GARCH.\n\n")
+cat("---\n\n")
+
+while (iteration < max_iterations && !convergence) {
+  iteration <- iteration + 1
+  
+  cat("### ITÉRATION ", iteration, "\n\n")
+  
+  # ==========================================
+  # ÉTAPE 1 : ESTIMATION ARIMA
+  # ==========================================
+  
+  cat("#### Étape 1.", iteration, ".A - Estimation ARIMA\n\n")
+  
+  fit_arima <- auto.arima(serie_courante,
+                          seasonal = FALSE,
+                          stepwise = FALSE,
+                          approximation = FALSE,
+                          ic = "aicc",
+                          trace = FALSE)
+  
+  arima_order <- arimaorder(fit_arima)
+  cat("- Modèle sélectionné : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n")
+  cat("- AICc = ", round(fit_arima$aicc, 2), "\n\n")
+  
+  residus_arima <- residuals(fit_arima)
+  
+  # ==========================================
+  # ÉTAPE 2 : TESTS SUR RÉSIDUS ARIMA
+  # ==========================================
+  
+  cat("#### Étape 1.", iteration, ".B - Tests sur résidus ARIMA\n\n")
+  
+  lb_residus <- Box.test(residus_arima, type = "Ljung-Box", lag = 40)
+  lb_residus2 <- Box.test(residus_arima^2, type = "Ljung-Box", lag = 40)
+  arch_test <- ArchTest(residus_arima, lags = 10)
+  
+  tests_iter <- data.frame(
+    Test = c("Ljung-Box (résidus)", "Ljung-Box (résidus²)", "ARCH"),
+    `P-value` = c(round(lb_residus$p.value, 4), round(lb_residus2$p.value, 4), 
+                  round(arch_test$p.value, 4)),
+    Décision = c(
+      ifelse(lb_residus$p.value > 0.05, "✓ OK", "✗ Autocorrélation"),
+      ifelse(lb_residus2$p.value > 0.05, "✓ OK", "✗ Hétéroscédasticité"),
+      ifelse(arch_test$p.value > 0.05, "✓ OK", "✗ Effet ARCH")
+    )
+  )
+  
+  print(kable(tests_iter, caption = paste("Tests Itération", iteration)) %>%
+          kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+  
+  cat("\n")
+  
+  # ==========================================
+  # DÉCISION : GARCH NÉCESSAIRE ?
+  # ==========================================
+  
+  if (arch_test$p.value < 0.05) {
+    cat("**Décision** : Effet ARCH détecté (p = ", round(arch_test$p.value, 4), ") → **Estimation GARCH**\n\n")
+    
+    # ==========================================
+    # ÉTAPE 3 : ESTIMATION GARCH
+    # ==========================================
+    
+    cat("#### Étape 1.", iteration, ".C - Comparaison modèles GARCH\n\n")
+    
+    models_list <- list(
+      list(name = "GARCH(1,1)", model = "sGARCH", order = c(1,1)),
+      list(name = "GARCH(1,2)", model = "sGARCH", order = c(1,2)),
+      list(name = "GARCH(2,1)", model = "sGARCH", order = c(2,1)),
+      list(name = "TGARCH(1,1)", model = "fGARCH", submodel = "TGARCH", order = c(1,1)),
+      list(name = "EGARCH(1,1)", model = "eGARCH", order = c(1,1)),
+      list(name = "GJR-GARCH(1,1)", model = "gjrGARCH", order = c(1,1))
+    )
+    
+    results_garch <- data.frame()
+    fitted_models <- list()
+    
+    for (i in seq_along(models_list)) {
+      model_spec <- models_list[[i]]
+      
+      tryCatch({
+        if (model_spec$model == "fGARCH") {
+          spec <- ugarchspec(
+            variance.model = list(model = model_spec$model, 
+                                  submodel = model_spec$submodel,
+                                  garchOrder = model_spec$order),
+            mean.model = list(armaOrder = c(arima_order[1], arima_order[3]), 
+                              include.mean = TRUE),
+            distribution.model = "norm"
+          )
+        } else {
+          spec <- ugarchspec(
+            variance.model = list(model = model_spec$model, 
+                                  garchOrder = model_spec$order),
+            mean.model = list(armaOrder = c(arima_order[1], arima_order[3]), 
+                              include.mean = TRUE),
+            distribution.model = "norm"
+          )
+        }
+        
+        fit <- ugarchfit(spec = spec, data = serie_courante, solver = "hybrid")
+        
+        fitted_models[[model_spec$name]] <- fit
+        
+        results_garch <- rbind(results_garch, data.frame(
+          Modèle = model_spec$name,
+          AIC = round(infocriteria(fit)[1], 4),
+          BIC = round(infocriteria(fit)[2], 4),
+          Convergence = ifelse(convergence(fit) == 0, "✓", "✗")
+        ))
+      }, error = function(e) {
+        results_garch <<- rbind(results_garch, data.frame(
+          Modèle = model_spec$name,
+          AIC = NA,
+          BIC = NA,
+          Convergence = "Erreur"
+        ))
+      })
+    }
+    
+    results_garch <- results_garch[order(results_garch$AIC, na.last = TRUE), ]
+    
+    print(kable(results_garch, caption = paste("Comparaison GARCH - Itération", iteration)) %>%
+            kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+    
+    cat("\n")
+    
+    best_model_name <- results_garch$Modèle[1]
+    best_fit <- fitted_models[[best_model_name]]
+    
+    cat("- **Meilleur modèle** : ", best_model_name, " (AIC = ", round(results_garch$AIC[1], 2), ")\n\n")
+    
+    # ==========================================
+    # ÉTAPE 4 : VALIDATION MODÈLE GARCH
+    # ==========================================
+    
+    cat("#### Étape 1.", iteration, ".D - Validation modèle complet\n\n")
+    
+    residus_std_garch <- residuals(best_fit, standardize = TRUE)
+    
+    lb_garch <- Box.test(residus_std_garch, type = "Ljung-Box", lag = 40)
+    lb_garch2 <- Box.test(residus_std_garch^2, type = "Ljung-Box", lag = 40)
+    arch_garch <- ArchTest(residus_std_garch, lags = 10)
+    
+    tests_garch_iter <- data.frame(
+      Test = c("Ljung-Box (résidus std.)", "Ljung-Box (résidus² std.)", "ARCH (résidus std.)"),
+      `P-value` = c(round(lb_garch$p.value, 4), round(lb_garch2$p.value, 4), 
+                    round(arch_garch$p.value, 4)),
+      Décision = c(
+        ifelse(lb_garch$p.value > 0.05, "✓ OK", "✗ Autocorrélation"),
+        ifelse(lb_garch2$p.value > 0.05, "✓ OK", "✗ Hétéroscédasticité"),
+        ifelse(arch_garch$p.value > 0.05, "✓ OK", "✗ Effet ARCH")
+      )
+    )
+    
+    print(kable(tests_garch_iter, caption = paste("Validation GARCH - Itération", iteration)) %>%
+            kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+    
+    cat("\n")
+    
+    # Enregistrement
+    historique_iterations <- rbind(historique_iterations, data.frame(
+      Iteration = iteration,
+      Modele_ARIMA = paste0("ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")"),
+      Modele_GARCH = best_model_name,
+      ARCH_pvalue = round(arch_garch$p.value, 4),
+      LB_residus2_pvalue = round(lb_garch2$p.value, 4),
+      Convergence_atteinte = ifelse(arch_garch$p.value > 0.05 && lb_garch2$p.value > 0.05, "OUI", "NON")
+    ))
+    
+    modeles_estimes[[paste0("Iter_", iteration)]] <- list(
+      arima = fit_arima,
+      garch = best_fit,
+      residus = residus_std_garch
+    )
+    
+    # ==========================================
+    # DÉCISION DE CONVERGENCE
+    # ==========================================
+    
+    if (arch_garch$p.value > 0.05 && lb_garch2$p.value > 0.05) {
+      cat("**CONVERGENCE ATTEINTE** : Plus d'effet ARCH résiduel !\n\n")
+      cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], 
+          ") + ", best_model_name, "**\n\n")
+      convergence <- TRUE
+    } else {
+      cat("Effets résiduels détectés → **Itération suivante nécessaire**\n\n")
+      cat("Les résidus standardisés deviennent la nouvelle série à modéliser\n\n")
+      serie_courante <- residus_std_garch
+    }
+    
+  } else {
+    cat("**Décision** : Pas d'effet ARCH (p = ", round(arch_test$p.value, 4), ") → **ARIMA seul suffit**\n\n")
+    
+    historique_iterations <- rbind(historique_iterations, data.frame(
+      Iteration = iteration,
+      Modele_ARIMA = paste0("ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")"),
+      Modele_GARCH = "Aucun",
+      ARCH_pvalue = round(arch_test$p.value, 4),
+      LB_residus2_pvalue = round(lb_residus2$p.value, 4),
+      Convergence_atteinte = "OUI"
+    ))
+    
+    modeles_estimes[[paste0("Iter_", iteration)]] <- list(
+      arima = fit_arima,
+      garch = NULL,
+      residus = residus_arima
+    )
+    
+    cat("**CONVERGENCE ATTEINTE** : Modèle ARIMA seul est adéquat !\n\n")
+    cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n\n")
+    convergence <- TRUE
+  }
+  
+  cat("---\n\n")
+}
+
+# ==========================================
+# SYNTHÈSE FINALE
+# ==========================================
+
+cat("# 4. Synthèse du Processus Itératif\n\n")
+
+if (convergence) {
+  cat("**Convergence atteinte après ", iteration, " itération(s)**\n\n")
+} else {
+  cat("**Maximum d'itérations atteint (50) sans convergence complète**\n\n")
+}
+
+print(kable(historique_iterations, caption = "Historique Complet des Itérations") %>%
+        kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+        column_spec(6, bold = TRUE, color = ifelse(historique_iterations$Convergence_atteinte == "OUI", "green", "red")))
+
+cat("\n")
+```
+
+# 5. Analyse Détaillée du Modèle Final
+
+```{r analyse_finale, results='asis'}
+modele_final <- modeles_estimes[[paste0("Iter_", iteration)]]
+
+cat("## 5.1 Spécification du Modèle Final\n\n")
+
+if (!is.null(modele_final$garch)) {
+  cat("**Modèle complet retenu** : ARIMA-GARCH combiné\n\n")
+  cat("```\n")
+  print(modele_final$garch)
+  cat("```\n\n")
+} else {
+  cat("**Modèle retenu** : ARIMA seul\n\n")
+  cat("```\n")
+  print(summary(modele_final$arima))
+  cat("```\n\n")
+}
+
+cat("## 5.2 Analyse Graphique des Résidus Finaux\n\n")
+
+residus_finaux <- modele_final$residus
+
+par(mfrow = c(3, 2), mar = c(4, 4, 3, 1))
+
+# Série temporelle
+plot(residus_finaux, main = "Résidus Finaux Standardisés", ylab = "Résidus", 
+     col = "darkgreen", type = "h")
+abline(h = 0, col = "red", lty = 2)
+
+# Histogramme
+hist(residus_finaux, breaks = 50, main = "Distribution des Résidus", 
+     xlab = "Résidus", col = "lightgreen", border = "white", probability = TRUE)
+curve(dnorm(x, mean = mean(residus_finaux), sd = sd(residus_finaux)), 
+      add = TRUE, col = "red", lwd = 2)
+
+# QQ-plot
+qqnorm(residus_finaux, main = "QQ-Plot")
+qqline(residus_finaux, col = "red", lwd = 2)
+
+# ACF
+acf(residus_finaux, main = "ACF des Résidus", lag.max = 30)
+
+# ACF résidus²
+acf(residus_finaux^2, main = "ACF des Résidus²", lag.max = 30, col = "purple")
+
+# Volatilité (si GARCH)
+if (!is.null(modele_final$garch)) {
+  sigma_finale <- sigma(modele_final$garch)
+  plot(sigma_finale, main = "Volatilité Conditionnelle Finale", 
+       ylab = "σ(t)", col = "red3", lwd = 1.5)
+} else {
+  plot(residus_finaux^2, main = "Carrés des Résidus", 
+       ylab = "Résidus²", col = "purple", type = "h")
+}
+
+cat("\n## 5.3 Tests de Diagnostic Finaux\n\n")
+
+lb_final <- Box.test(residus_finaux, type = "Ljung-Box", lag = 40)
+lb_final2 <- Box.test(residus_finaux^2, type = "Ljung-Box", lag = 40)
+arch_final <- ArchTest(residus_finaux, lags = 10)
+
+tests_finaux <- data.frame(
+  Test = c("Ljung-Box (résidus)", "Ljung-Box (résidus²)", "ARCH"),
+  Statistique = c(round(lb_final$statistic, 4), round(lb_final2$statistic, 4), 
+                  round(arch_final$statistic, 4)),
+  `P-value` = c(round(lb_final$p.value, 4), round(lb_final2$p.value, 4), 
+                round(arch_final$p.value, 4)),
+  Interprétation = c(
+    ifelse(lb_final$p.value > 0.05, "✓ Résidus = bruit blanc", "✗ Autocorrélation résiduelle"),
+    ifelse(lb_final2$p.value > 0.05, "✓ Pas d'hétéroscédasticité", "✗ Hétéroscédasticité résiduelle"),
+    ifelse(arch_final$p.value > 0.05, "✓ Pas d'effet ARCH", "✗ Effet ARCH résiduel")
+  )
+)
+
+print(kable(tests_finaux, caption = "Tests de Diagnostic sur le Modèle Final") %>%
+        kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+
+cat("\n")
 
 
 
