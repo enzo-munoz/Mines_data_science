@@ -518,7 +518,7 @@ cat("---\n\n")
 while (iteration < max_iterations && !convergence) {
   iteration <- iteration + 1
   
-  cat("### 🔄 ITÉRATION ", iteration, "\n\n")
+  cat("### ITÉRATION ", iteration, "\n\n")
   
   # ==========================================
   # ÉTAPE 1 : ESTIMATION ARIMA
@@ -694,13 +694,13 @@ while (iteration < max_iterations && !convergence) {
     # ==========================================
     
     if (arch_garch$p.value > 0.05 && lb_garch2$p.value > 0.05) {
-      cat("🎯 **CONVERGENCE ATTEINTE** : Plus d'effet ARCH résiduel !\n\n")
-      cat("✅ Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], 
+      cat("**CONVERGENCE ATTEINTE** : Plus d'effet ARCH résiduel !\n\n")
+      cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], 
           ") + ", best_model_name, "**\n\n")
       convergence <- TRUE
     } else {
-      cat("⚠ Effets résiduels détectés → **Itération suivante nécessaire**\n\n")
-      cat("➡️ Les résidus standardisés deviennent la nouvelle série à modéliser\n\n")
+      cat("Effets résiduels détectés → **Itération suivante nécessaire**\n\n")
+      cat("Les résidus standardisés deviennent la nouvelle série à modéliser\n\n")
       serie_courante <- residus_std_garch
     }
     
@@ -722,8 +722,8 @@ while (iteration < max_iterations && !convergence) {
       residus = residus_arima
     )
     
-    cat("🎯 **CONVERGENCE ATTEINTE** : Modèle ARIMA seul est adéquat !\n\n")
-    cat("✅ Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n\n")
+    cat("**CONVERGENCE ATTEINTE** : Modèle ARIMA seul est adéquat !\n\n")
+    cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n\n")
     convergence <- TRUE
   }
   
@@ -737,9 +737,9 @@ while (iteration < max_iterations && !convergence) {
 cat("# 4. Synthèse du Processus Itératif\n\n")
 
 if (convergence) {
-  cat("✅ **Convergence atteinte après ", iteration, " itération(s)**\n\n")
+  cat("**Convergence atteinte après ", iteration, " itération(s)**\n\n")
 } else {
-  cat("⚠ **Maximum d'itérations atteint (50) sans convergence complète**\n\n")
+  cat("**Maximum d'itérations atteint (50) sans convergence complète**\n\n")
 }
 
 print(kable(historique_iterations, caption = "Historique Complet des Itérations") %>%
@@ -857,7 +857,7 @@ cat("3. **Arrêt** : Convergence OU 50 itérations\n\n")
 cat("### Résultats Obtenus\n\n")
 
 cat("- **Nombre d'itérations nécessaires** : ", iteration, "\n")
-cat("- **Convergence** : ", ifelse(convergence, "✅ OUI", "❌ NON"), "\n")
+cat("- **Convergence** : ", ifelse(convergence, "OUI", "NON"), "\n")
 
 if (iteration == 1) {
   cat("- **Interprétation** : La série était déjà bien modélisée dès la première itération. ")
@@ -884,7 +884,7 @@ cat("3. **Interprétation** : Un modèle complexe peut perdre en interprétabili
 cat("---\n\n")
 cat("**Conclusion finale** : ")
 if (convergence && all(historique_iterations$Convergence_atteinte[iteration] == "OUI")) {
-  cat("✅ Le processus itératif a permis d'obtenir un modèle optimal où tous les tests ")
+  cat(" Le processus itératif a permis d'obtenir un modèle optimal où tous les tests ")
   cat("de diagnostic sont satisfaits. Le modèle final peut être utilisé pour la prévision.\n")
 } else {
   cat("⚠ Le modèle nécessite une validation supplémentaire ou des ajustements (distribution Student-t, ")
@@ -1140,7 +1140,7 @@ cat("## 7.5 Interprétation des Résultats\n\n")
 cat("### Performance du Modèle\n\n")
 
 if (mae < 0.5 && taux_couverture >= 90) {
-  cat("✅ **Excellente performance** : Le modèle prédit avec précision les mouvements de l'EUR/USD. ")
+  cat("**Excellente performance** : Le modèle prédit avec précision les mouvements de l'EUR/USD. ")
   cat("Les erreurs sont faibles et les intervalles de confiance sont bien calibrés.\n\n")
 } else if (mae < 1 && taux_couverture >= 80) {
   cat("✓ **Bonne performance** : Le modèle capture la tendance générale même si quelques prévisions ")
@@ -1189,7 +1189,7 @@ train <- window(log_returns, end = time(des_data)[n-horizon])
 test <- window(log_returns, start = time(des_data)[n-horizon+1])
 
 # ----------------------------------------------------
-# 📘 Spécification du modèle ARIMA(2,0,3) + EGARCH(1,1)
+#   Spécification du modèle ARIMA(2,0,3) + EGARCH(1,1)
 # ----------------------------------------------------
 spec_final <- ugarchspec(
   variance.model = list(model = "eGARCH", garchOrder = c(1,1)),
@@ -1198,11 +1198,11 @@ spec_final <- ugarchspec(
 )
 
 # ----------------------------------------------------
-# 📈 Estimation du modèle sur la partie train
+#   Estimation du modèle sur la partie train
 # ----------------------------------------------------
 modele <- ugarchfit(spec = spec_final, data = train)
 # ----------------------------------------------------
-# 🔮 Prévision au jour le jour sur la série test
+#   Prévision au jour le jour sur la série test
 # ----------------------------------------------------
 # On prédit une étape à la fois et on met à jour le modèle à chaque fois
 
@@ -1210,7 +1210,7 @@ prev <- ugarchforecast(modele, n.ahead=horizon)
 
 
 # ----------------------------------------------------
-# 📊 Intervalles de confiance (à 95%)
+#   Intervalles de confiance (à 95%)
 # ----------------------------------------------------
 alpha <- 0.05
 z <- qnorm(1 - alpha / 2)
@@ -1268,7 +1268,7 @@ cat("MSE : ", mse, "\n",
 des_data <- ts(as.numeric(log_returns), frequency = 365)
 
 # ----------------------------------------------------
-# ✂️ Split 80/20 avec gestion des dates
+#   Split 80/20 avec gestion des dates
 # ----------------------------------------------------
 n <- length(des_data)
 horizon <- floor(0.2 * n)
@@ -1288,12 +1288,12 @@ spec_final <- ugarchspec(
 )
 
 # ----------------------------------------------------
-# 📈 Estimation du modèle sur la partie train
+#   Estimation du modèle sur la partie train
 # ----------------------------------------------------
 modele <- ugarchfit(spec = spec_final, data = train)
 
 # ----------------------------------------------------
-# 🔮 Prévisions jour par jour sur la série test
+#   révisions jour par jour sur la série test
 # ----------------------------------------------------
 n_forecast <- length(test)
 prev_mean <- numeric(n_forecast)
@@ -1308,7 +1308,7 @@ for (i in 1:n_forecast) {
 }
 
 # ----------------------------------------------------
-# 📊 Intervalles de confiance à 95 %
+#   Intervalles de confiance à 95 %
 # ----------------------------------------------------
 alpha <- 0.05
 z <- qnorm(1 - alpha / 2)
@@ -1316,7 +1316,7 @@ ic_sup <- prev_mean + z * prev_sigma
 ic_inf <- prev_mean - z * prev_sigma
 
 # ----------------------------------------------------
-# 📉 Tracé des prévisions avec IC
+#   Tracé des prévisions avec IC
 # ----------------------------------------------------
 start_prev <- time(des_data)[n - horizon + 1]
 prev_ts <- ts(prev_mean, start = start_prev, frequency = 365)
