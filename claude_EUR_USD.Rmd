@@ -141,9 +141,6 @@ pacf(log_returns^2, main = "PACF des Rendements²", lag.max = 30, col = "red")
 # 4. Étape 3 : Estimation - Sélection du Modèle ARIMA
 
 ```{r arima_selection}
-cat("═══════════════════════════════════════════════════════\n")
-cat("  SÉLECTION AUTOMATIQUE DU MEILLEUR MODÈLE ARIMA\n")
-cat("═══════════════════════════════════════════════════════\n\n")
 
 fit_arima <- auto.arima(log_returns,
                         seasonal = FALSE,
