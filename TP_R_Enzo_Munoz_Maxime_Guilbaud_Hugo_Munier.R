@@ -16,8 +16,7 @@ library(gridExtra)
 library(moments)
 library(psych)
 
-data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Série temporelle/TP évalué/data.csv",
-                 stringsAsFactors = FALSE)
+data <- read.csv("data.csv", stringsAsFactors = FALSE)
 
 
 #head(data)
@@ -1086,11 +1085,6 @@ print(kable(historique_iterations, caption = "Historique Complet des Itérations
         column_spec(6, bold = TRUE, color = ifelse(historique_iterations$Convergence_atteinte == "OUI", "green", "red")))
 
 cat("\n")
-```
-
-# 5. Analyse Détaillée du Modèle Final
-
-```{r analyse_finale, results='asis'}
 modele_final <- modeles_estimes[[paste0("Iter_", iteration)]]
 
 cat("## 5.1 Spécification du Modèle Final\n\n")
