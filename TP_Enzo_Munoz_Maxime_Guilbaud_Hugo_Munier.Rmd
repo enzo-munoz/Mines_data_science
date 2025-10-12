@@ -808,8 +808,6 @@ modele_subsetARMA_GARCH <- ugarchfit(spec = spec_subsetARMA_GARCH, data = des_da
 
 3. Critères AIC & BIC
 ```{r}
-show(modele_subsetARMA_ARCH)
-show(modele_subsetARMA_GARCH)
 infocriteria(modele_subsetARMA_ARCH)
 infocriteria(modele_subsetARMA_GARCH)
 ```
@@ -994,4 +992,5 @@ print(performances)
 4/5. Comparer, analyser et commenter les résultats
 
 Nous avons décidé également d'ajouter le modèle proposé par la fonction auto.arima afin de compléter cette étude. La comparaison nous montre que le SARIMA fournit les meilleurs prévisions car son critère MSE. Il capture ainsi plus finement la dynamique moyenne et la saisonnalité de la série de données. De plus, le modèle ARMA-ARCH affiche le meilleur critère MAPE. Par ailleurs les tests ARCH non significatifs et les faibles gains AIC/BIC nous indiquent que la dynamique de volatilité apporte peu pour les températures puisque la variabilité est surtout saisonière. Ainsi la qualité des prévisions dépend surtout de la modélisation de la moyenne qui refléte la tendance lente de la série et notamment de la forte saisonnalité annuelle qui détermine le niveau de température mois par mois.
+
 Le modèle SARIMA se présente comme le meilleur modèle puisqu'il minimise l'erreur en °C. Cependant dans le cadre du TP, nous retenons le modèle ARMA subset - ARCH(1) puisqu'il offre la meilleure précision relative et une erreur proche de celle du modèle SARIMA. A contrario, le modèle ARMA subset ne capte pas suffisemment la saisonnalité et ainsi dégrade ses performances prédictives.
