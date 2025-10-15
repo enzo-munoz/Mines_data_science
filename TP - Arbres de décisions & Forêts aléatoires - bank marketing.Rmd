@@ -1,7 +1,17 @@
 ---
 title: "TP - Abres de décision et forêts aléatoires"
-output: html_document
-date: "2025-10-15"
+author: "Enzo Munoz - Hugo Munier - Maxime Guilbaud"
+date: "2025-10-21"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+header-includes:
+  - \usepackage{float}
 ---
 
 ```{r setup, include=FALSE}
@@ -10,5 +20,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r cars}
 ```
+
 
 
