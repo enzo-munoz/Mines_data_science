@@ -58,7 +58,6 @@ data <- read.csv("data.csv", stringsAsFactors = FALSE)
 
 #head(data)
 #str(data)
-
 data$temp_C <- (data$TAVG..Degrees.Fahrenheit. - 32)/1.8
 
 #head(data[,c("TAVG..Degrees.Fahrenheit.","temp_C")])
@@ -975,6 +974,7 @@ Le modèle SARIMA se présente comme le meilleur modèle puisqu'il minimise l'er
 ## V. Bonus
 
 
+
 # Introduction
 
 Ce document présente une analyse **itérative complète** du taux de change EUR/USD suivant la **méthodologie de Box-Jenkins étendue** :
@@ -1393,7 +1393,6 @@ cat("\n")
 # 6. Conclusion
 
 Cette étude adopte une approche itérative pour la modélisation de la série temporelle des rendements EUR/USD. Plutôt que de s'en tenir à l'estimation d'un unique modèle ARIMA-GARCH, cette méthodologie examine systématiquement les résidus standardisés afin de s'assurer qu'aucune structure résiduelle n'a été négligée. Le processus commence par l'estimation d'un modèle ARIMA sur la série initiale, suivi de tests d'effets ARCH sur les résidus. Lorsque des effets ARCH sont détectés, six spécifications GARCH sont comparées selon le critère d'information d'Akaike (AIC), et le modèle optimal est retenu. Les résidus standardisés du modèle sélectionné sont ensuite testés à nouveau, et s'ils présentent encore des effets ARCH, ils deviennent la nouvelle série à modéliser pour l'itération suivante. Ce processus se poursuit jusqu'à convergence ou jusqu'à un maximum de 50 itérations. Dans le cadre de cette analyse, la convergence a été atteinte dès la première itération, indiquant que le modèle initial capturait adéquatement l'ensemble de la structure temporelle et de la volatilité conditionnelle des rendements. Cette approche systématique garantit la robustesse du modèle final et valide son utilisation pour des fins de prévision, tout en limitant les risques de surajustement grâce au critère d'arrêt imposé.
-
 
 
 
