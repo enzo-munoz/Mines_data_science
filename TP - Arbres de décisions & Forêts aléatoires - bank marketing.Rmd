@@ -1,5 +1,5 @@
 ---
-title: "TP - bank"
+title: "TP - Abres de décision et forêts aléatoires"
 output: html_document
 date: "2025-10-15"
 ---
@@ -10,4 +10,5 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r cars}
 ```
+
 
