@@ -30,19 +30,28 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r}
+library(dplyr)
+```
+
+
 The data is related with direct marketing campaigns of a Portuguese banking institution. The 
 marketing campaigns were based on phone calls. Often, more than one contact to the same client 
 was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') 
 subscribed. The classification goal is to predict if the client will subscribe (yes/no) a term deposit 
 (variable y) 
 
+
 ```{r}
 data<- read.csv("7 bank_marketing.csv", sep=";")
+data <- data %>%
+  mutate(across(where(is.character), as.factor))
 x<- subset(data, select = -class)
 x
 y <- data$class
 y
 ```
+
 
 ```{r}
 # Charger les bibliothèques
@@ -121,13 +130,7 @@ ggcorr(X, label = TRUE)
 ```
 on voit si ya loan alors moins de chance de souscrire à un term deposit. 
 si ya housing = no plus de chance de souscrire à un term deposit. 
-```{r}
-library(dplyr)
 
-data <- data %>%
-  mutate(across(where(is.character), as.factor))
-data
-```
 Il y a 2 colonnes qui ne sont pas catégorielle la balance et l'âge. Transformer ces features en catégorie implique de couper la feature d'une manière et entraîne une augmentation du nombre d'hyperparamètre. Avant de découper on refait une analyse à priori pour comprendre mieux les tendances. 
 ```{r}
 library(ggplot2)

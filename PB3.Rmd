@@ -1,0 +1,51 @@
+---
+title: "PB3"
+output: html_document
+---
+
+Le modèle de la forêt d’isolement (Isolation Forest) est un algorithme d’apprentissage non supervisé utilisé principalement pour la détection d’anomalies.
+
+ Principe :
+
+Au lieu de modéliser la distribution des données normales, l’Isolation Forest isole directement les observations. Elle construit de nombreux arbres binaires aléatoires où, à chaque nœud, une caractéristique et une valeur de coupure sont choisies au hasard.
+Les points anormaux, étant rares et différents, sont plus faciles à isoler : ils nécessitent moins de divisions pour être séparés du reste des données.
+
+ Idée clé :
+
+Moins une observation nécessite de divisions pour être isolée,
+➜ plus elle est susceptible d’être une anomalie.
+
+ Avantages :
+
+Très efficace sur de grands volumes de données.
+Ne nécessite pas d’étiquettes (non supervisé).
+Gère bien les données de grande dimension.
+
+```{r}
+data<- read.csv("KPIs for telecommunication.csv", sep = ";")
+data
+```
+
+```{r}
+# Moyenne
+mean_values <- sapply(data, mean, na.rm = TRUE)
+
+# Variance
+var_values <- sapply(data, var, na.rm = TRUE)
+
+# Écart-type
+sd_values <- sapply(data, sd, na.rm = TRUE)
+
+# Regrouper dans un tableau
+stats_summary <- data.frame(
+  Variable = names(data),
+  Moyenne = mean_values,
+  Variance = var_values,
+  Ecart_Type = sd_values
+)
+
+print(stats_summary)
+
+```
+
+
