@@ -1,0 +1,48 @@
+---
+title: "TP - Abres de décision et forêts aléatoires"
+author: "Enzo Munoz - Hugo Munier - Maxime Guilbaud"
+date: "2025-10-21"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(
+  fig.width = 7,        
+  fig.height = 4.5,
+  out.width = "90%",    
+  fig.align = "center", 
+  fig.pos = "H"       
+)
+knitr::opts_chunk$set(
+  message = FALSE,   
+  warning = FALSE    
+)
+```
+
+```{r}
+data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Arbres de décision et forêts aléatoires/7 bank_marketing.csv", 
+                 sep=";", header=TRUE)
+head(data)
+summary(data)
+```
+```{r}
+# transfo en variable catégoritielle
+data$class <- as.factor(data$class)
+
+# valeurs manquantes
+print("=== Nombre de NA par variable ===")
+colSums(is.na(data))
+print("=== Nombre de 'unknown' par variable ===")
+sapply(data, function(x) sum(x == "unknown", na.rm=TRUE))
+```
