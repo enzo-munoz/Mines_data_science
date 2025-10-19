@@ -2,6 +2,10 @@ library(ggplot2)
 library(dplyr)
 library(GGally)
 library(vcd)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(pROC)
 
 data <- read.csv("7 bank_marketing.csv", sep = ";")
 
@@ -11,6 +15,14 @@ cat("=== Structure du dataset ===\n")
 str(data)
 cat("\n=== Résumé statistique ===\n")
 summary(data)
+colSums(is.na(data))
+
+# --- Encodage des variables catégoriques ---
+
+data <- data %>%
+  mutate(across(where(is.character), as.factor))
+
+str(data)
 
 # --- 3. Distribution de la variable cible ---
 ggplot(data, aes(x = class, fill = class)) +
@@ -100,9 +112,116 @@ INTERPRÉTATION DES TENDANCES :
 • Les clients sans crédit logement (housing = no) sont plus enclins à souscrire.
 • Ceux avec un crédit personnel (loan = yes) souscrivent moins souvent.
 • L'âge médian et le solde (balance) sont plus élevés chez les souscripteurs.
-• Une longue durée d'appel (duration) augmente fortement la probabilité de 'yes'.
 • Le succès d'une campagne précédente (poutcome = success) est un facteur clé.
 • Les tests du Chi² confirment des liens significatifs entre 'marital', 'education',
   'housing', 'loan', 'poutcome' et la variable cible 'class'.
 ---------------------------------------------------------------
 ")
+
+# --- Séparation apprentissage / test (70 / 30) ---
+set.seed(123)
+train_index <- createDataPartition(data$class, p = 0.7, list = FALSE)
+train_data <- data[train_index, ]
+test_data  <- data[-train_index, ]
+
+
+
+# --- Construction de l’arbre de décision CART ---
+tree_model <- rpart(class ~ ., data = train_data, method = "class", control = rpart.control(cp = 0.01))
+rpart.plot(tree_model, main = "Arbre de décision initial")
+
+# --- Validation croisée intégrée et choix du cp optimal ---
+printcp(tree_model)
+plotcp(tree_model, main = "Sélection du paramètre de complexité (cp)")
+best_cp <- tree_model$cptable[which.min(tree_model$cptable[, "xerror"]), "CP"]
+
+# --- Élagage (arbre optimal) ---
+pruned_tree <- prune(tree_model, cp = best_cp)
+rpart.plot(pruned_tree, main = "Arbre de décision élagué (optimal)")
+
+# --- Évaluation sur le jeu de test ---
+pred <- predict(pruned_tree, newdata = test_data, type = "class")
+conf_mat <- confusionMatrix(pred, test_data$class, positive = "yes")
+print(conf_mat)
+
+# --- Courbe ROC et AUC ---
+pred_prob <- predict(pruned_tree, newdata = test_data, type = "prob")[, 2]
+roc_curve <- roc(test_data$class, pred_prob)
+plot(roc_curve, col = "blue", lwd = 2, main = "Courbe ROC - Arbre optimal")
+auc_value <- auc(roc_curve)
+cat("AUC =", auc_value, "\n")
+
+# --- Interprétation rapide ---
+cat("
+---------------------------------------------------------------
+INTERPRÉTATION DE L'ARBRE DE DÉCISION :
+---------------------------------------------------------------
+• L'arbre final est obtenu après élagage pour éviter le sur-apprentissage.
+• Le paramètre de complexité (cp) a été choisi par validation croisée intégrée.
+• L'arbre optimal permet de prédire efficacement la variable 'class'
+  (souscription à un dépôt à terme) en fonction des variables explicatives.
+• L’évaluation sur le jeu de test fournit la précision et l’AUC du modèle.
+---------------------------------------------------------------
+")
+
+
+# ============================================================
+# QUESTION 3 : Évaluation détaillée du modèle optimal
+# ============================================================
+
+# --- 3(a) Explorer les résultats de classification ---
+
+# Prédictions déjà obtenues
+pred <- predict(pruned_tree, newdata = test_data, type = "class")
+pred_prob <- predict(pruned_tree, newdata = test_data, type = "prob")[, 2]
+
+# --- i. Detailed Accuracy by Class (Precision, Recall, F1, etc.) ---
+# On utilise les sorties de confusionMatrix pour extraire les métriques
+conf_mat <- confusionMatrix(pred, test_data$class, positive = "yes")
+print(conf_mat)
+
+# Extraire les indicateurs principaux
+accuracy <- conf_mat$overall["Accuracy"]
+precision <- conf_mat$byClass["Precision"]
+recall <- conf_mat$byClass["Recall"]
+f1 <- conf_mat$byClass["F1"]
+specificity <- conf_mat$byClass["Specificity"]
+sensitivity <- conf_mat$byClass["Sensitivity"]
+
+cat("
+---------------------------------------------------------------
+MÉTRIQUES DE PERFORMANCE DU MODÈLE OPTIMAL (JEU DE TEST)
+---------------------------------------------------------------
+Accuracy     :", round(accuracy, 3), "\n",
+    "Précision    :", round(precision, 3), "\n",
+    "Rappel       :", round(recall, 3), "\n",
+    "F1-Score     :", round(f1, 3), "\n",
+    "Sensibilité  :", round(sensitivity, 3), "\n",
+    "Spécificité  :", round(specificity, 3), "\n",
+    "---------------------------------------------------------------\n"
+)
+
+# --- ii. Courbe ROC et AUC ---
+roc_curve <- roc(test_data$class, pred_prob)
+plot(roc_curve, col = "blue", lwd = 2, main = "Courbe ROC - Modèle optimal (CART)")
+auc_value <- auc(roc_curve)
+cat("AUC :", round(auc_value, 3), "\n")
+
+# --- iii. Autres indicateurs possibles ---
+# On peut calculer le taux d’erreur, MCC, et Kappa
+error_rate <- 1 - accuracy
+kappa <- conf_mat$overall["Kappa"]
+
+cat("
+Autres mesures :
+Taux d’erreur :", round(error_rate, 3), "\n",
+    "Cohen’s Kappa :", round(kappa, 3), "\n"
+)
+
+# --- Visualisation complémentaire ---
+# Graphe comparant la probabilité prédite et la classe réelle
+ggplot(data.frame(Prob = pred_prob, Réel = test_data$class), aes(x = Réel, y = Prob, fill = Réel)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(title = "Probabilités prédites par le modèle selon la classe réelle",
+       x = "Classe réelle", y = "Probabilité prédite (Yes)") +
+  theme_minimal()
