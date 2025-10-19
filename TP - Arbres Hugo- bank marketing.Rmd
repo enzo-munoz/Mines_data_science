@@ -31,18 +31,254 @@ knitr::opts_chunk$set(
 ```
 
 ```{r}
-data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Arbres de décision et forêts aléatoires/7 bank_marketing.csv", 
+# Bibliothèques utilisées
+
+#install.packages("ggcorrplot")
+#install.packages("GGally")
+#install.packages("corrplot")
+library(GGally)
+library(ggplot2)
+library(ggcorrplot)
+library(corrplot)
+```
+
+```{r}
+# Importation des données
+
+data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Arbres de décision et forêts aléatoires/TP/7 bank_marketing.csv", 
                  sep=";", header=TRUE)
 head(data)
 summary(data)
 ```
-```{r}
-# transfo en variable catégoritielle
-data$class <- as.factor(data$class)
 
+```{r}
 # valeurs manquantes
 print("=== Nombre de NA par variable ===")
 colSums(is.na(data))
 print("=== Nombre de 'unknown' par variable ===")
 sapply(data, function(x) sum(x == "unknown", na.rm=TRUE))
 ```
+
+```{r}
+# Transformation en facteur
+factor_vars <- c("marital", "education", "contact", "poutcome", "default", "housing", "loan", "class")
+data[factor_vars] <- lapply(data[factor_vars], as.factor)
+
+# Transformation en numérique
+numeric_vars <- c("balance", "age")
+data[numeric_vars] <- lapply(data[numeric_vars], as.numeric)
+
+# Vérification
+str(data)
+summary(data)
+```
+```{r}
+# Analyse univariée
+hist(data$age,
+     main = "Distribution de l'âge",
+     xlab = "Âge",
+     col = "skyblue",
+     border = "white",
+     breaks = 20)
+
+hist(data$balance,
+     main = "Distribution du solde (balance)",
+     xlab = "Balance (€)",
+     col = "orange",
+     border = "white",
+     breaks = 50,
+     xlim = c(-5000, 10000))
+
+boxplot(data$age,
+        main = "Boxplot de l'âge",
+        col = "skyblue",
+        horizontal = TRUE)
+
+boxplot(data$balance,
+        main = "Boxplot du solde (balance)",
+        col = "orange",
+        horizontal = TRUE)
+
+
+for (var in factor_vars) {
+  print(
+    ggplot(data, aes_string(x = var, fill = var)) +
+      geom_bar() +
+      labs(title = paste("Répartition de", var),
+           x = var,
+           y = "Effectifs") +
+      theme_minimal() +
+      theme(legend.position = "none")
+  )
+}
+```
+
+```{r}
+# Analyse bivariée
+
+ggplot(data, aes(x = class, y = age, fill = class)) +
+  geom_boxplot() +
+  labs(title = "Boxplot de l'âge par classe",
+       x = "Classe (Souscription dépôt à terme)",
+       y = "Âge") +
+  theme_minimal()
+
+ggplot(data, aes(x = age, fill = class)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Densité de l'âge selon la classe",
+       x = "Âge", y = "Densité") +
+  theme_minimal()
+
+ggplot(data, aes(x = class, y = balance, fill = class)) +
+  geom_boxplot() +
+  labs(title = "Boxplot du solde (balance) par classe",
+       x = "Classe (Souscription dépôt à terme)",
+       y = "Solde du compte (€)") +
+  theme_minimal()
+
+boxplot(balance ~ class, 
+        data = data,
+        main = "Distribution du solde par classe (zoom)",
+        xlab = "Classe (Souscription dépôt à terme)",
+        ylab = "Solde (€)",
+        col = c("orange", "skyblue"),
+        ylim = c(-2000, 10000))
+
+table(data$marital, data$class)
+prop.table(table(data$marital, data$class), margin = 1)
+
+# Barplot empilé
+
+ggplot(data, aes(x = marital, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon marital",
+       x = "Situation maritale", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+table(data$education, data$class)
+prop.table(table(data$education, data$class), margin = 1)
+
+ggplot(data, aes(x = education, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon éducation",
+       x = "Niveau d'éducation", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+for (var in c("housing", "loan", "default")) {
+  print(table(data[[var]], data$class))
+  print(prop.table(table(data[[var]], data$class), margin = 1))
+  
+  print(
+    ggplot(data, aes_string(x = var, fill = "class")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Taux de souscription selon", var),
+           x = var, y = "Proportion") +
+      scale_y_continuous(labels = scales::percent) +
+      theme_minimal()
+  )
+}
+
+table(data$contact, data$class)
+prop.table(table(data$contact, data$class), margin = 1)
+
+ggplot(data, aes(x = contact, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon type de contact",
+       x = "Type de contact", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+table(data$poutcome, data$class)
+prop.table(table(data$poutcome, data$class), margin = 1)
+
+ggplot(data, aes(x = poutcome, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon résultat campagne précédente",
+       x = "Résultat précédent", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+```
+
+```{r}
+numeric_data <- data[, numeric_vars]
+
+cat_vars <- c("marital", "education", "default", "housing", "loan", "contact", "poutcome","class")
+dummies <- dummyVars(~ ., data = data[, cat_vars])
+cat_data <- data.frame(predict(dummies, newdata = data))
+
+data_corr <- cbind(numeric_data, cat_data)
+cor_matrix <- cor(data_corr, use = "complete.obs")
+
+plot_df <- cbind(data_corr, class = data$class)
+
+vars_to_plot <- c("age", "balance", "marital.married", "marital.divorced","marital.single", "education.tertiary", "housing.yes", "loan.yes", "poutcome.success")
+
+ggcorrplot(cor_matrix,
+           hc.order = TRUE, 
+           type = "lower",
+           lab = FALSE,          
+           lab_size = 2.5,
+           colors = c("red", "white", "blue"),
+           title = "Matrice de corrélation")
+
+corrplot(cor_matrix, method = "color", type = "upper",
+         tl.cex = 0.7,
+         title = "Matrice de corrélations")
+
+ggpairs(plot_df,
+        columns = vars_to_plot,
+        aes(color = class, alpha = 0.6),
+        upper = list(continuous = "points"),
+        title = "Matrice de dispersion - variables clés")
+
+```
+## PARTIE II - Foret aléatoire
+
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(janitor)
+library(skimr)
+library(caret)
+library(pROC)
+library(randomForest)
+library(ranger)
+library(vip)
+```
+## Split Apprentissage
+```{r}
+target_col <- "class"
+levels(data[[target_col]])
+
+x_cols <- setdiff(names(data), target_col)
+
+set.seed(1234)
+idx <- createDataPartition(data[[target_col]], p = 0.8, list = FALSE)
+train <- data[idx, ]
+test  <- data[-idx, ]
+
+dim(train)
+dim(test)
+
+prop.table(table(train[[target_col]]))
+prop.table(table(test[[target_col]]))
+```
+Afin d’évaluer la performance des modèles de manière robuste, nous avons séparé l’échantillon en un jeu d’apprentissage (80 %, soit 6 292 observations) et un jeu de test (20 %, soit 1 572 observations). Les résultats montrent que la répartition des classes est parfaitement équilibrée entre les deux sous-ensembles : environ 77 % des clients n’ont pas souscrit (“no”) et 23 % ont souscrit (“yes”), aussi bien dans le jeu d’apprentissage que dans le jeu de test. Cette étape garantit que l’échantillon de test est représentatif et qu’il permettra d’évaluer correctement la capacité de généralisation des modèles. Elle est particulièrement importante dans ce contexte où la classe positive (“yes”) est minoritaire, car elle assure que les indicateurs de performance (accuracy, précision, rappel, AUC) pourront être interprétés de façon fiable sans biais lié au déséquilibre des données.
+
+## Schéma de validation et métriques
+
+```{r}
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 5, repeats = 2,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  sampling = "down",
+  savePredictions = "final"
+)
+```
+Pour évaluer et comparer les modèles de forêts aléatoires, nous avons adopté un schéma de validation croisée robuste. Le jeu d’apprentissage a été soumis à une validation croisée à 5 folds, répétée 2 fois afin de réduire la variance des estimations. Comme la variable cible est déséquilibrée (77 % “no” contre 23 % “yes”), un down-sampling a été appliqué dans chaque fold pour rééquilibrer les classes et éviter un apprentissage biaisé. Les modèles ont été évalués selon plusieurs indicateurs : l’AUC/ROC, qui mesure la capacité globale de discrimination, la sensibilité (rappel) pour juger la détection des souscriptions effectives, et la spécificité pour contrôler les faux positifs. Après sélection du meilleur modèle sur ce protocole, une évaluation finale est conduite sur le jeu de test indépendant afin de mesurer sa capacité de généralisation à de nouvelles données.
+
