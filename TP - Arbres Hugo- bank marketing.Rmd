@@ -246,7 +246,8 @@ library(caret)
 library(pROC)
 library(randomForest)
 library(ranger)
-library(vip)
+library(rpart)
+library(rpart.plot)
 ```
 ## Split Apprentissage
 ```{r}
@@ -281,4 +282,195 @@ ctrl <- trainControl(
 )
 ```
 Pour évaluer et comparer les modèles de forêts aléatoires, nous avons adopté un schéma de validation croisée robuste. Le jeu d’apprentissage a été soumis à une validation croisée à 5 folds, répétée 2 fois afin de réduire la variance des estimations. Comme la variable cible est déséquilibrée (77 % “no” contre 23 % “yes”), un down-sampling a été appliqué dans chaque fold pour rééquilibrer les classes et éviter un apprentissage biaisé. Les modèles ont été évalués selon plusieurs indicateurs : l’AUC/ROC, qui mesure la capacité globale de discrimination, la sensibilité (rappel) pour juger la détection des souscriptions effectives, et la spécificité pour contrôler les faux positifs. Après sélection du meilleur modèle sur ce protocole, une évaluation finale est conduite sur le jeu de test indépendant afin de mesurer sa capacité de généralisation à de nouvelles données.
+
+## Arbre de décision illustratif
+```{r}
+model_tree <- rpart(class ~ ., data = train, method = "class")
+rpart.plot(model_tree, type=2, extra=104, main="Arbre de décision")
+```
+L’arbre de décision simple met en évidence le rôle central de la variable poutcome (résultat de la campagne précédente) dans la prédiction. Lorsque poutcome est “failure” ou “other”, la probabilité de non-souscription est très élevée (86 %), tandis qu’elle s’inverse lorsque l’issue est différente, avec une majorité de souscriptions (65 %). Cet arbre illustre bien la logique de segmentation, mais reste limité car il ne capture qu’une règle principale et demeure instable. Pour obtenir un modèle plus robuste et généralisable, il est donc nécessaire de recourir à une forêt aléatoire, combinaison de nombreux arbres.
+
+## Implémentation A
+```{r}
+grid_rf <- expand.grid(
+  mtry = floor(seq(2, sqrt(length(x_cols))*2, length.out = 6))
+)
+
+set.seed(1234)
+rf_fit <- train(
+  x = train[, x_cols],
+  y = train[[target_col]],
+  method = "rf",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneGrid = grid_rf,
+  ntree = 500,
+  importance = TRUE
+)
+
+print(rf_fit)
+
+plot(rf_fit, main = "Performance ROC en fonction de mtry (Random Forest)")
+```
+Pour l’implémentation Random Forest, nous avons testé différentes valeurs de l’hyperparamètre mtry, correspondant au nombre de variables candidates sélectionnées aléatoirement à chaque division de nœud. L’évaluation a été réalisée par validation croisée à 5 folds, répétée deux fois, avec un équilibrage par down-sampling pour compenser le déséquilibre entre classes. Les résultats montrent que la performance, mesurée par l’AUC (ROC), décroît lorsque mtry augmente : elle atteint un maximum à mtry = 2 avec une AUC de 0,796, puis diminue progressivement jusqu’à 0,761 pour mtry = 6. Cette tendance s’explique par le fait qu’un nombre trop élevé de variables testées à chaque split réduit la diversité des arbres et favorise le sur-apprentissage. Le modèle optimal retenu est donc celui avec mtry = 2, qui offre le meilleur compromis entre sensibilité (0,761) et spécificité (0,721). Ce réglage maximise la capacité discriminante de la forêt aléatoire et améliore la détection des souscripteurs, objectif prioritaire de notre étude.
+
+## Imlplémentation B
+```{r}
+grid_rg <- expand.grid(
+  mtry = floor(seq(2, sqrt(length(x_cols))*2, length.out = 6)),
+  splitrule = c("gini", "extratrees"),
+  min.node.size = c(1, 5, 10)     
+)
+
+set.seed(1234)
+rg_fit <- train(
+  x = train[, x_cols],
+  y = train[[target_col]],
+  method = "ranger",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneGrid = grid_rg,
+  num.trees = 800,
+  importance = "permutation",
+  respect.unordered.factors = "partition"
+)
+
+print(rg_fit)
+
+plot(rg_fit, main = "Performance ROC selon hyperparamètres (Ranger)")
+```
+Pour l’implémentation Ranger, nous avons choisi cette méthode car elle est plus rapide que randomForest, gère efficacement les grands volumes de données et offre davantage de possibilités de réglage des hyperparamètres. Contrairement à un arbre de décision unique qui nécessite un élagage explicite, Ranger permet de contrôler la complexité de chaque arbre via des paramètres comme min.node.size (taille minimale des nœuds terminaux, jouant un rôle d’élagage implicite), splitrule (critère de séparation, gini ou extratrees), ainsi que mtry (nombre de variables candidates par split). Ces paramètres ont été optimisés grâce à une validation croisée répétée 5×2, avec down-sampling pour compenser le déséquilibre entre les classes.
+
+Les résultats montrent que la performance (AUC) est maximale pour mtry = 2, splitrule = extratrees et min.node.size = 1, avec une AUC de 0,801. Ce résultat confirme que, dans ce jeu de données, favoriser une forte diversité des arbres (faible mtry, règle de séparation plus aléatoire, nœuds très fins) permet d’améliorer la capacité de discrimination du modèle. Comparativement aux autres configurations, l’AUC décroît lorsque mtry augmente ou lorsque min.node.size devient trop grand, car la forêt perd en granularité et en diversité. Le modèle optimal retenu maximise la détection des clients souscripteurs, objectif central de l’étude marketing, tout en conservant une sensibilité (0,740) et une spécificité (0,741) équilibrées.
+
+## Sélection du modèle le plus optimal
+
+```{r}
+auc_rf <- max(rf_fit$results$ROC)
+auc_rg <- max(rg_fit$results$ROC)
+
+cat("AUC RandomForest :", round(auc_rf, 4), "\n")
+cat("AUC Ranger       :", round(auc_rg, 4), "\n")
+
+if (auc_rf >= auc_rg) {
+  best_model <- rf_fit
+  model_name <- "Random Forest (package randomForest)"
+} else {
+  best_model <- rg_fit
+  model_name <- "Ranger (package ranger)"
+}
+
+cat("==> Modèle retenu :", model_name, "\n")
+cat("Hyperparamètres optimaux :\n")
+print(best_model$bestTune)
+```
+La comparaison des deux implémentations montre que la forêt aléatoire classique (randomForest) atteint une AUC maximale de 0,796, tandis que l’implémentation ranger obtient une AUC légèrement supérieure, à 0,802. Même si l’écart reste modeste, il confirme l’intérêt de ranger, qui combine une plus grande flexibilité dans le réglage des hyperparamètres et une efficacité computationnelle accrue. Le modèle optimal retenu est donc la forêt aléatoire entraînée avec ranger, configurée avec mtry = 2 (nombre de variables candidates à chaque split), la règle de séparation extratrees (qui favorise la diversité des arbres) et une taille minimale de nœud de 1 (arbres plus fins et expressifs). Ce réglage maximise la diversité entre arbres et permet d’améliorer la capacité discriminante de la forêt sur un problème déséquilibré. Ainsi, le modèle ranger est jugé plus performant et mieux adapté pour la suite de l’analyse, car il maximise la détection des clients susceptibles de souscrire tout en conservant une bonne capacité de généralisation.
+
+## Evaluation sur le jeu de test
+
+```{r}
+pred_prob_rf <- predict(rf_fit, newdata = test, type = "prob")[, "yes"]
+pred_prob_rg <- predict(rg_fit, newdata = test, type = "prob")[, "yes"]
+
+pred_cls_rf <- factor(ifelse(pred_prob_rf >= 0.5, "yes", "no"), levels = c("no","yes"))
+pred_cls_rg <- factor(ifelse(pred_prob_rg >= 0.5, "yes", "no"), levels = c("no","yes"))
+
+cm_rf <- confusionMatrix(pred_cls_rf, test[[target_col]], positive = "yes")
+cm_rg <- confusionMatrix(pred_cls_rg, test[[target_col]], positive = "yes")
+
+cat("=== RandomForest ===\n")
+print(cm_rf)
+cat("\n=== Ranger ===\n")
+print(cm_rg)
+
+roc_rf <- pROC::roc(response = test[[target_col]], predictor = pred_prob_rf,
+                    levels = c("no","yes"), direction = "<")
+roc_rg <- pROC::roc(response = test[[target_col]], predictor = pred_prob_rg,
+                    levels = c("no","yes"), direction = "<")
+
+auc_rf <- pROC::auc(roc_rf)
+auc_rg <- pROC::auc(roc_rg)
+
+cat("\nAUC RandomForest (test) :", round(auc_rf, 3), "\n")
+cat("AUC Ranger (test)       :", round(auc_rg, 3), "\n")
+
+plot(roc_rf, legacy.axes = TRUE, col = "blue",
+     main = "Courbes ROC sur le jeu de test - RandomForest vs Ranger")
+plot(roc_rg, add = TRUE, col = "red")
+legend("bottomright",
+       legend = c(paste0("RandomForest AUC=", round(auc_rf,3)),
+                  paste0("Ranger AUC=", round(auc_rg,3))),
+       col = c("blue", "red"), lty = 1, cex = 0.9)
+```
+L’évaluation finale sur le jeu de test montre que les deux implémentations de forêts aléatoires atteignent des performances proches, avec une AUC de 0,825 pour RandomForest et 0,821 pour Ranger. Ces valeurs indiquent une bonne capacité de discrimination entre les clients susceptibles de souscrire et ceux qui ne souscrivent pas. En termes de matrice de confusion, RandomForest obtient une accuracy de 77,2 % avec une sensibilité de 0,799 et une spécificité de 0,763, tandis que Ranger présente une accuracy légèrement inférieure (75,9 %) mais une sensibilité comparable (0,802) et une spécificité un peu plus faible (0,747). Dans les deux cas, le rappel (sensibilité) est satisfaisant, ce qui est essentiel dans notre contexte marketing où l’objectif est de maximiser la détection des souscripteurs (“yes”), même au prix d’un plus grand nombre de faux positifs.
+
+Ces résultats confirment que les deux méthodes sont robustes et adaptées à la problématique, mais montrent également que le gain de performance de Ranger observé en validation croisée ne se retrouve pas de manière significative sur le jeu de test. Le choix entre les deux implémentations peut donc se fonder sur des critères pratiques : RandomForest offre des performances légèrement supérieures en AUC et en spécificité, tandis que Ranger reste intéressant pour sa rapidité d’exécution et sa flexibilité dans l’optimisation des hyperparamètres.
+
+## Importance des variables
+```{r}
+
+# Importance des variables - RandomForest
+varImp_rf <- varImp(rf_fit, scale = TRUE)
+print(varImp_rf)
+plot(varImp_rf, top = 15, main = "Importance des variables - RandomForest")
+
+varImp_rg <- varImp(rg_fit, scale = TRUE)
+print(varImp_rg)
+plot(varImp_rg, top = 15, main = "Importance des variables - Ranger")
+```
+L’analyse de l’importance des variables met en évidence des résultats cohérents entre les deux implémentations de forêts aléatoires. Dans les deux cas, la variable poutcome (résultat de la campagne marketing précédente) apparaît comme la plus déterminante dans la prédiction de la souscription à un dépôt à terme. Cela est intuitif : un client ayant déjà répondu favorablement à une campagne antérieure est beaucoup plus susceptible de souscrire à nouveau.
+
+La variable housing (présence d’un crédit immobilier) arrive en seconde position, suivie de loan (crédit personnel), de l’âge et du solde du compte (balance). Ces variables traduisent des facteurs socio-économiques influençant directement la probabilité d’épargne ou de souscription : par exemple, un client ayant déjà un crédit immobilier ou personnel peut avoir une capacité de souscription réduite.
+
+Les variables marital (situation familiale), education, contact et default ont une importance plus faible, mais contribuent néanmoins à affiner le modèle en segmentant les profils. La cohérence entre RandomForest et Ranger renforce la robustesse de l’interprétation, bien que l’ordre exact des variables secondaires varie légèrement.
+
+Enfin, il est à noter que certaines variables fortement corrélées à la souscription mais uniquement observables après coup (comme duration dans d’autres versions du dataset) ne figurent pas ici. Cela évite tout biais de fuite d’information (data leakage) et garantit que l’interprétation repose sur des variables disponibles au moment de la décision.
+
+En conclusion, ces résultats montrent que l’historique des interactions marketing (poutcome) et les variables financières liées aux crédits et au patrimoine (housing, loan, balance) constituent les principaux déterminants de la souscription, ce qui est cohérent avec les attentes d’un ciblage marketing bancaire.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
