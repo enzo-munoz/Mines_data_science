@@ -27,25 +27,420 @@ data
 ```
 
 ```{r}
-# Moyenne
-mean_values <- sapply(data, mean, na.rm = TRUE)
 
-# Variance
-var_values <- sapply(data, var, na.rm = TRUE)
+summary(data)
+missing_count <- colSums(is.na(data))
 
-# Écart-type
-sd_values <- sapply(data, sd, na.rm = TRUE)
+cat("\nPourcentage de valeurs manquantes:\n")
+print(round(missing_count / nrow(data) * 100, 2))
 
-# Regrouper dans un tableau
-stats_summary <- data.frame(
-  Variable = names(data),
-  Moyenne = mean_values,
-  Variance = var_values,
-  Ecart_Type = sd_values
+```
+
+
+```{r}
+# Détection des outliers
+detect_outliers <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower <- Q1 - 1.5 * IQR
+  upper <- Q3 + 1.5 * IQR
+  which(x < lower | x > upper)
+}
+
+outliers_list <- lapply(data, detect_outliers)
+outliers_count <- sapply(outliers_list, length)
+
+cat("\n### Nombre d'outliers par variable\n")
+print(outliers_count)
+
+lignes_outliers <- unique(unlist(outliers_list))
+
+cat("\n**Nombre total de lignes avec au moins un outlier:**", length(lignes_outliers), "\n")
+
+# Stocker les numéros de ligne avec >= 3 outliers
+outliers_detected <- c()
+
+for(ligne in lignes_outliers) {
+  features_pb <- names(outliers_list)[sapply(outliers_list, function(x) ligne %in% x)]
+  
+  # Afficher et stocker uniquement si >= 3 outliers
+  if(length(features_pb) >= 3) {
+    outliers_detected <- c(outliers_detected, ligne)
+    valeurs <- sapply(features_pb, function(f) data[ligne, f])
+  }
+}
+
+cat("\n**Total lignes avec >= 3 outliers:**", length(outliers_detected), "\n")
+```
+```{r}
+cat("\nSummary des outliers par feature:\n")
+for(feature in names(outliers_list)) {
+  if(length(outliers_list[[feature]]) > 0) {
+    cat("\n", feature, ":\n", sep="")
+    valeurs_outliers <- data[outliers_list[[feature]], feature]
+    print(summary(valeurs_outliers))
+  }
+}
+```
+
+Avec ces 747 lignes de potentiel outlier liste, on va pouvoir les comparer avec les résultats des modèles isolation forest qu'on va générer. On remarque un nombre important de ligne considéré comme outlier parce que KPI1 vaut 0 environ 330 sur 1300. Doivent-ils être tous considérer comme des outliers ? Non. Pareil pour KPI9 ? 
+Le modèle qui sera considéré comme le meilleur sera celui qui ne considère pas outlier leslignes pour laquelles KPI1 = 0 met la ligne comme anomalie. Et le meilleur celui. 
+
+Pour les données manquantes on va dans un premier temps essayer de les prédire avec 3 méthodes.
+ - La moyenne
+ - Les K plus proches voisins avant on va calculer la matrice de corrélation pour voir si les autres KPI ont une incidence sur respectivement les KPI4, KPI6, KPI9 qui ont repectivement 36.70% 20.66% et 27.99% d'omission. Il s'agira de voir aussi l'importance d'une normalisation avant d'utiliser l'algorithme pour la similarité. 
+ - on les enlève ? 
+ 
+#1. KNN
+```{r}
+# Matrice de corrélation sur données complètes
+
+data_complete <- na.omit(data)
+
+# Calcul et visualisation de la corrélation
+cor_matrix <- cor(data_complete)
+
+
+# Visualisation
+library(corrplot)
+
+corrplot(cor_matrix, method = "color", type = "upper", 
+         addCoef.col = "black", number.cex = 0.7,
+         tl.col = "black", tl.srt = 45,
+         title = "Matrice de corrélation (données complètes)")
+
+# Corrélations avec les KPI à imputer
+cat("\nCorrélations avec KPI4:\n")
+print(sort(cor_matrix[, "KPI4"], decreasing = TRUE)[c(1,2,3)])
+
+cat("\nCorrélations avec KPI6:\n")
+print(sort(cor_matrix[, "KPI6"], decreasing = TRUE)[c(1,2,3)])
+
+cat("\nCorrélations avec KPI9:\n")
+print(sort(cor_matrix[, "KPI9"], decreasing = TRUE)[c(1,2,3)])
+```
+
+Aucune des variables (KPI4,6,9) n'est corrélé avec aucune autres. Donc l'utilisation de l'algorithme des KNN est compromis.  
+Pour KPI4, 6, 9 étant donné que la description statistique au dessus on voit bien que les valeurs médiane feront très bien l'affaire. Pour KPI4 il y a min à 80 mais 1er quantile à 100 et max à 100. On comprend bien qu'il faille donné 100 aux valeurs NA et que la ligne avec 80 est un outlier. Même raisonnement avec KPI6 et 9. 
+
+Moral : au lieu de partir sur une technique difficile KNN (temps de calcul plus long) et calculer la matrice de corrélations pour voir si les KNN est une bonne méthode. Il vaut mieux regarder la statistique descriptive qui permet d'utiliser une méthode plus simple. 
+
+Faut-il supprimer les colonnes puissent qu'elle n'apporte pas plus d'information ? Ou faut-il l'a garder pour mettre en évidence l'anomalie du KPI = 80 ? 
+
+
+On convertit tous les NA en la médiane de la colonne considéré. 
+```{r}
+library(dplyr)
+
+data_final <- data %>%
+  mutate(across(everything(), ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x)))
+
+```
+
+
+
+```{r}
+library(isotree)
+library(ggplot2)
+
+# Division train/test (70/30)
+set.seed(123)
+splitter   = data_final %>%
+  rsample::initial_split(prop = 0.7)
+train = rsample::training(splitter)
+test  = rsample::testing(splitter)
+
+iso = isolationForest$new(sample_size = 245)
+iso$fit(pima_train)
+
+scores_train = train %>%
+  iso$predict() %>%
+  arrange(desc(anomaly_score))
+
+scores_train
+
+scores_test = test %>%
+  iso$predict() %>%
+  arrange(desc(anomaly_score))
+
+scores_test
+
+
+```
+
+```{r}
+library(isotree)
+library(ggplot2)
+library(rsample)
+library(dplyr)
+
+# Division train/test
+set.seed(123)
+splitter <- data_final %>%
+  rsample::initial_split(prop = 0.7)
+train <- rsample::training(splitter)
+test  <- rsample::testing(splitter)
+
+
+# Définition de 4 modèles différents
+configs <- data.frame(
+  model = c("Modèle 1", "Modèle 2", "Modèle 3", "Modèle 4"),
+  ntrees = c(100, 500, 500, 250),
+  sample_size = c(100, 100, 512, 256),
+  ndim = c(1, 1, 3, 2)
 )
 
-print(stats_summary)
+# Stockage des résultats
+all_scores <- list()
+comparison_results <- data.frame()
 
+for(i in 1:nrow(configs)) {
+  # Entraînement du modèle
+  model <- isolation.forest(train, 
+                           ntrees = configs$ntrees[i],
+                           sample_size = configs$sample_size[i],
+                           ndim = configs$ndim[i])
+  
+  # Scores sur test
+  scores <- predict(model, test)
+  all_scores[[i]] <- data.frame(
+    score = scores,
+    model = configs$model[i]
+  )
+  
+  # Métriques de comparaison
+  comparison_results <- rbind(comparison_results, data.frame(
+    model = configs$model[i],
+    ntrees = configs$ntrees[i],
+    sample_size = configs$sample_size[i],
+    ndim = configs$ndim[i],
+    variance = var(scores),
+    range = max(scores) - min(scores),
+    q95 = quantile(scores, 0.95),
+    mean = mean(scores),
+    sd = sd(scores)
+  ))
+}
+
+# Combiner tous les scores
+all_scores_df <- do.call(rbind, all_scores)
+
+# Graphique comparatif avec facets
+ggplot(all_scores_df, aes(x = score)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+  geom_vline(data = all_scores_df %>% 
+               group_by(model) %>% 
+               summarise(q95 = quantile(score, 0.95)),
+             aes(xintercept = q95), 
+             color = "red", linetype = "dashed", linewidth = 1) +
+  facet_wrap(~model, ncol = 2, scales = "free_y") +
+  labs(title = "Distribution des scores d'anomalie - Comparaison des 4 modèles",
+       subtitle = "Ligne rouge = 95e percentile",
+       x = "Score d'anomalie", 
+       y = "Fréquence") +
+  theme_minimal()
+```
+
+
+```{r}
+# Boxplot comparatif
+ggplot(all_scores_df, aes(x = model, y = score, fill = model)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Comparaison des distributions de scores",
+       x = "Modèle", 
+       y = "Score d'anomalie") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Density plot superposé
+ggplot(all_scores_df, aes(x = score, fill = model)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Densité des scores - Comparaison",
+       x = "Score d'anomalie", 
+       y = "Densité") +
+  theme_minimal()
+```
+
+```{r}
+print(comparison_results)
+```
+On trouve que le modèle avec le plus de variance est le modèle 1. On s'en doutait : 100 arbres seulement par rapport à 500 ou 250 pour les autres modèles. ndim = 1 donc plus de variance aussi dépend du jeu de données utilisé et pareil sample size 100 contre 256 ou 512 pour d'autres forêt. Le range est maximal pour le modèle 3 : 0.4063617 pourtant son q95 = 0.4669773 est bas, c'est la modèle 1 avec 0.5719 qui a le plus haut. C'est donc potentiellement le modèle 1 parmi les 4 qui est le meilleur.  
+
+
+```{r}
+data_final$has_multiple_outliers <- 1:nrow(data_final) %in% outliers_detected
+
+set.seed(123)
+splitter <- data_final %>%
+  rsample::initial_split(prop = 0.7, strata = has_multiple_outliers)
+
+train <- rsample::training(splitter)
+test  <- rsample::testing(splitter)
+
+outliers_list_test <- lapply(test[, -ncol(test)], detect_outliers)  # Exclure la colonne has_multiple_outliers
+lignes_outliers_test <- unique(unlist(outliers_list_test))
+
+outliers_detected_test <- c()
+for(ligne in lignes_outliers_test) {
+  features_pb <- names(outliers_list_test)[sapply(outliers_list_test, function(x) ligne %in% x)]
+  if(length(features_pb) >= 3) {
+    outliers_detected_test <- c(outliers_detected_test, ligne)
+  }
+}
+
+cat("Outliers détectés dans test (>= 3):", length(outliers_detected_test), "\n")
+
+params_grid <- expand.grid(
+  ntrees = c(100, 250, 500),
+  sample_size = c(128, 256, 512),
+  ndim = c(1, 2, 3)
+)
+
+compare_outliers <- function(predicted, detected) {
+  communs <- intersect(predicted, detected)
+  
+  # Taux de détection
+  taux <- length(communs) / length(detected) * 100
+  
+  # F1-score
+  precision <- length(communs) / length(predicted)
+  recall <- length(communs) / length(detected)
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  return(list(communs = length(communs), taux = taux, f1 = f1))
+}
+
+results <- data.frame()
+
+for(i in 1:nrow(params_grid)) {
+  cat("Test modèle", i, "/", nrow(params_grid), "\n")
+  
+  model_temp <- isolation.forest(train[, -ncol(train)],  # Exclure has_multiple_outliers
+                                 ntrees = params_grid$ntrees[i],
+                                 sample_size = params_grid$sample_size[i],
+                                 ndim = params_grid$ndim[i])
+  
+  scores_test <- predict(model_temp, test[, -ncol(test)])
+  seuil <- quantile(scores_test, 0.95)
+  lignes_predites <- which(scores_test > seuil)
+  
+  # Comparaison
+  comp_result <- compare_outliers(lignes_predites, outliers_detected_test)
+  
+  results <- rbind(results, data.frame(
+    ntrees = params_grid$ntrees[i],
+    sample_size = params_grid$sample_size[i],
+    ndim = params_grid$ndim[i],
+    communs = comp_result$communs,
+    taux_detection = comp_result$taux,
+    f1_score = comp_result$f1
+  ))
+}
+
+# 6. CLASSEMENT DES MODÈLES
+results <- results[order(-results$f1_score), ]
+cat("\n### Top 5 modèles (selon F1-score)\n")
+print(head(results, 5))
+print(tail(results, 5))
+```
+
+différence de 4 outliers commun entre les modèles testé. 
+
+
+```{r}
+# Récupérer les 3 modèles à analyser
+best_model_1 <- results[1, ]
+best_model_2 <- results[2, ]
+worst_model <- results[nrow(results), ]
+
+models_to_analyze <- list(
+  list(params = best_model_1, name = "Meilleur modèle"),
+  list(params = best_model_2, name = "2ème meilleur modèle"),
+  list(params = worst_model, name = "Pire modèle")
+)
+
+# Fonction pour analyser un modèle
+analyze_model <- function(params, model_name) {
+  cat("\n### ", model_name, "\n")
+  cat("Paramètres: ntrees =", params$ntrees, ", sample_size =", params$sample_size, 
+      ", ndim =", params$ndim, "\n")
+  cat("F1-score:", round(params$f1_score, 3), "| Taux détection:", 
+      round(params$taux_detection, 2), "%\n\n")
+  
+  # Entraîner le modèle
+  model <- isolation.forest(train[, -ncol(train)],
+                           ntrees = params$ntrees,
+                           sample_size = params$sample_size,
+                           ndim = params$ndim)
+  
+  scores <- predict(model, test[, -ncol(test)])
+  test$anomaly_score <- scores
+  
+  # Top 5 scores les plus hauts
+  top5_high <- test[order(-test$anomaly_score), ][1:5, ]
+  cat("#### Top 5 scores d'anomalies les plus élevés\n")
+  print(top5_high[, c("anomaly_score")])
+  cat("\n")
+  
+  # Top 5 scores les plus bas
+  top5_low <- test[order(test$anomaly_score), ][1:5, ]
+  cat("#### Top 5 scores d'anomalies les plus bas\n")
+  print(top5_low[, c("anomaly_score")])
+  cat("\n")
+  
+  # Statistiques des scores
+  cat("#### Statistiques des scores\n")
+  cat("- Moyenne:", round(mean(scores), 4), "\n")
+  cat("- Médiane:", round(median(scores), 4), "\n")
+  cat("- Écart-type:", round(sd(scores), 4), "\n")
+  cat("- Min:", round(min(scores), 4), "| Max:", round(max(scores), 4), "\n")
+  cat("- Range:", round(max(scores) - min(scores), 4), "\n\n")
+  
+  # Vérifier si les top anomalies sont dans outliers_detected
+  indices_high <- as.numeric(rownames(top5_high))
+  in_outliers_high <- sum(indices_high %in% outliers_detected_test)
+  cat("Parmi le top 5, ", in_outliers_high, " sont des outliers détectés (IQR)\n\n")
+  
+  return(scores)
+}
+
+# Analyser les 3 modèles
+scores_best1 <- analyze_model(best_model_1, "Meilleur modèle")
+scores_best2 <- analyze_model(best_model_2, "2ème meilleur modèle")
+scores_worst <- analyze_model(worst_model, "Pire modèle")
+
+# Comparaison graphique (2 plots seulement)
+par(mfrow = c(1, 2))
+
+# Plot 1: Distribution des scores
+boxplot(list(Meilleur = scores_best1, 
+             Deuxieme = scores_best2, 
+             Pire = scores_worst),
+        col = c("lightgreen", "lightblue", "lightcoral"),
+        main = "Distribution des scores d'anomalie",
+        ylab = "Score")
+
+# Plot 2: Variance des scores
+variances <- c(var(scores_best1), var(scores_best2), var(scores_worst))
+barplot(variances, 
+        names.arg = c("Meilleur", "2ème", "Pire"),
+        col = c("lightgreen", "lightblue", "lightcoral"),
+        main = "Variance des scores",
+        ylab = "Variance")
+
+par(mfrow = c(1, 1))
+
+# Analyse comparative finale
+cat("\n### Analyse comparative\n")
+cat("**Variance des scores:**\n")
+cat("- Meilleur modèle:", round(var(scores_best1), 6), "\n")
+cat("- 2ème modèle:", round(var(scores_best2), 6), "\n")
+cat("- Pire modèle:", round(var(scores_worst), 6), "\n\n")
+
+cat("**Interprétation:**\n")
+cat("Une variance plus élevée indique une meilleure séparation entre anomalies et données normales.\n")
+cat("Les meilleurs modèles devraient avoir un range plus large et mieux identifier les outliers IQR.\n")
 ```
 
 
