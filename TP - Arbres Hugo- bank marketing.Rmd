@@ -41,7 +41,7 @@ library(ggplot2)
 library(ggcorrplot)
 library(corrplot)
 ```
-
+## Importation des données
 ```{r}
 # Importation des données
 
@@ -50,7 +50,9 @@ data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines 
 head(data)
 summary(data)
 ```
+Le jeu de données étudié comprend 8 variables de type catégoriel (caractère) et 2 variables numériques (float). L’objectif de notre travail est de développer un modèle prédictif pour la variable class, qui indique si un client souscrit ou non à un dépôt à terme.
 
+## Valeurs manquantes
 ```{r}
 # valeurs manquantes
 print("=== Nombre de NA par variable ===")
@@ -58,7 +60,9 @@ colSums(is.na(data))
 print("=== Nombre de 'unknown' par variable ===")
 sapply(data, function(x) sum(x == "unknown", na.rm=TRUE))
 ```
+Le jeu de données ne présente aucune valeur manquante, ce qui nous dispense d’effectuer des étapes de traitement ou d’imputation liées aux données manquantes.
 
+## Transformation des variables
 ```{r}
 # Transformation en facteur
 factor_vars <- c("marital", "education", "contact", "poutcome", "default", "housing", "loan", "class")
@@ -72,6 +76,9 @@ data[numeric_vars] <- lapply(data[numeric_vars], as.numeric)
 str(data)
 summary(data)
 ```
+Afin de pouvoir exploiter correctement l’ensemble des variables dans R, les variables catégorielles ont été converties en facteurs, tandis que les variables quantitatives ont été transformées en numériques.
+
+## Analyse univariée
 ```{r}
 # Analyse univariée
 hist(data$age,
@@ -112,7 +119,11 @@ for (var in factor_vars) {
   )
 }
 ```
+L’analyse univariée met en évidence un fort déséquilibre dans les données : la majorité des clients n’ont pas souscrit à un dépôt à terme (class = no), et la variable poutcome est dominée par la modalité failure. Du côté des variables numériques, l’âge est principalement concentré entre 30 et 40 ans, tandis que le solde des comptes présente une distribution asymétrique, avec la majorité des valeurs proches de zéro mais quelques soldes très élevés. Ces constats soulignent à la fois un déséquilibre de classes et la présence de valeurs extrêmes, deux éléments à prendre en compte pour la modélisation.
 
+Cette première analyse univariée permet dès le départ de visualiser la distribution des variables et d’en obtenir une première compréhension.
+
+## Analyse bivariée
 ```{r}
 # Analyse bivariée
 
@@ -200,7 +211,9 @@ ggplot(data, aes(x = poutcome, fill = class)) +
   scale_y_continuous(labels = scales::percent) +
   theme_minimal()
 ```
+L’analyse bivariée met en évidence plusieurs relations intéressantes avec la variable cible. Nous allons illustré notre porpos avec quelques exemples. Tout d’abord, la densité de l’âge selon la classe montre que les clients plus âgés ont tendance à souscrire davantage à un dépôt à terme, contrairement aux plus jeunes chez qui les refus sont plus fréquents. Ensuite, la variable poutcome illustre une relation claire : les clients dont la campagne précédente s’est soldée par un succès présentent un taux de souscription nettement plus élevé que ceux associés aux modalités failure ou other. Enfin, la variable housing révèle que les clients sans crédit logement sont proportionnellement plus enclins à souscrire, tandis que ceux ayant un prêt immobilier souscrivent beaucoup moins.
 
+## Analyse multidimensionnelle
 ```{r}
 numeric_data <- data[, numeric_vars]
 
@@ -220,9 +233,11 @@ corrplot(cor_matrix, method = "color", type = "upper",
          title = "Matrice de corrélations")
 
 ```
+La matrice de corrélations permet d’identifier les relations linéaires entre les variables. On observe que la variable cible class.yes est positivement corrélée avec poutcome.success, confirmant que les clients ayant connu un succès lors de la campagne précédente ont davantage tendance à souscrire. À l’inverse, elle est négativement corrélée avec poutcome.failure et housing.yes, ce qui reflète les tendances mises en évidence dans l’analyse bivariée. Concernant les variables explicatives entre elles, les corrélations restent globalement faibles, ce qui limite le risque de forte multicolinéarité.
+
+En résumé, l’analyse descriptive du jeu de données révèle à la fois un déséquilibre de la variable cible, des relations significatives entre certaines caractéristiques (âge, résultat de campagne, crédit logement) et la probabilité de souscription, ainsi que des corrélations globalement faibles entre variables explicatives, ce qui constitue une base solide pour la phase de modélisation.
+
 ## PARTIE II - Foret aléatoire
-
-
 ```{r}
 library(tidyverse)
 library(data.table)
