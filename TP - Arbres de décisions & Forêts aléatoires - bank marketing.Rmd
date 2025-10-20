@@ -51,6 +51,13 @@ x
 y <- data$class
 y
 ```
+```{r}
+# valeurs manquantes
+print("=== Nombre de NA par variable ===")
+colSums(is.na(data))
+print("=== Nombre de 'unknown' par variable ===")
+sapply(data, function(x) sum(x == "unknown", na.rm=TRUE))
+```
 
 
 ```{r}
@@ -162,4 +169,5 @@ Hypothèses :
 H₀ (nulle) : les variables sont indépendantes
 
 H₁ (alternative) : les variables sont associées
+
 
