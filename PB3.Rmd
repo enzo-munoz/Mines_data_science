@@ -1,8 +1,10 @@
 ---
 title: "PB3"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
-
+##Partie iii
 Le modèle de la forêt d’isolement (Isolation Forest) est un algorithme d’apprentissage non supervisé utilisé principalement pour la détection d’anomalies.
 
  Principe :
@@ -518,59 +520,114 @@ La faible structure de corrélation de notre jeu de données rend les **anomalie
 3. La nature des outliers détectés par la méthode IQR (seuils univariés)
 
 ```{r}
-
 # Récupérer les 3 modèles à analyser
 best_model_1 <- results[1, ]
 best_model_2 <- results[2, ]
 worst_model <- results[nrow(results), ]
 
-models_to_analyze <- list(
-  list(params = best_model_1, name = "Meilleur modèle"),
-  list(params = best_model_2, name = "2ème meilleur modèle"),
-  list(params = worst_model, name = "Pire modèle")
-)
+# Définir les colonnes à exclure
+cols_to_exclude <- c("has_multiple_outliers", "has_kpi1_zero", "strata_group")
+
+# Calculer les médianes de référence sur le test set
+test_clean_ref <- test[, !names(test) %in% cols_to_exclude]
+medians_ref <- sapply(test_clean_ref, median, na.rm = TRUE)
 
 # Fonction pour analyser un modèle
 analyze_model <- function(params, model_name) {
-  cat("\n### ", model_name, "\n")
-  cat("Paramètres: ntrees =", params$ntrees, ", sample_size =", params$sample_size, 
-      ", ndim =", params$ndim, "\n")
-  cat("F1-score:", round(params$f1_score, 3), "| Taux détection:", 
-      round(params$taux_detection, 2), "%\n\n")
+  cat("\n")
+  cat("### ", model_name, "\n\n", sep = "")
+  cat("**Configuration :** ntrees = ", params$ntrees, 
+      ", sample_size = ", params$sample_size, 
+      ", ndim = ", params$ndim, "\n\n", sep = "")
+  cat("**Performance :** F1-score = ", round(params$f1_score, 3), 
+      " | Taux de détection = ", round(params$taux_detection, 2), "%\n\n", sep = "")
   
   # Entraîner le modèle
-  model <- isolation.forest(train[, -ncol(train)],
+  train_clean <- train[, !names(train) %in% cols_to_exclude]
+  test_clean <- test[, !names(test) %in% cols_to_exclude]
+  
+  model <- isolation.forest(train_clean,
                            ntrees = params$ntrees,
                            sample_size = params$sample_size,
                            ndim = params$ndim)
   
-  scores <- predict(model, test[, -ncol(test)])
-  test$anomaly_score <- scores
+  scores <- predict(model, test_clean)
+  test_temp <- test_clean
+  test_temp$anomaly_score <- scores
   
-  # Top 5 scores les plus hauts
-  top5_high <- test[order(-test$anomaly_score), ][1:5, ]
-  cat("#### Top 5 scores d'anomalies les plus élevés\n")
-  print(top5_high[, c("anomaly_score")])
-  cat("\n")
+  # Top 5 anomalies
+  cat("#### Top 5 anomalies (scores élevés)\n\n")
+  top5_high <- test_temp[order(-test_temp$anomaly_score), ][1:5, ]
   
-  # Top 5 scores les plus bas
-  top5_low <- test[order(test$anomaly_score), ][1:5, ]
-  cat("#### Top 5 scores d'anomalies les plus bas\n")
-  print(top5_low[, c("anomaly_score")])
-  cat("\n")
+  # Analyser chaque ligne
+  for(i in 1:nrow(top5_high)) {
+    ligne_idx <- as.numeric(rownames(top5_high)[i])
+    
+    # Calculer écarts pour cette ligne
+    ecarts <- as.numeric(test_clean[ligne_idx, ]) - medians_ref
+    ecarts_percent <- (ecarts / medians_ref) * 100
+    names(ecarts_percent) <- names(test_clean)
+    
+    # Trier par écart absolu (CORRECTION ICI)
+    ecarts_abs <- abs(ecarts_percent)
+    top3_indices <- order(ecarts_abs, decreasing = TRUE)[1:3]
+    features_pb <- names(test_clean)[top3_indices]
+    
+    cat("**Ligne ", rownames(top5_high)[i], "** (Score: ", 
+        round(top5_high$anomaly_score[i], 4), ")\n\n", sep = "")
+    
+    deviation_df <- data.frame(
+      Feature = features_pb,
+      Valeur = round(as.numeric(test_clean[ligne_idx, features_pb]), 2),
+      Médiane = round(medians_ref[features_pb], 2),
+      Écart = round(ecarts[top3_indices], 2),
+      `Écart_%` = paste0(round(ecarts_percent[top3_indices], 1), "%")
+    )
+    print(knitr::kable(deviation_df, row.names = FALSE))
+    cat("\n")
+  }
+  
+  cat("---\n\n")
+  
+  # Top 5 normales
+  cat("#### Top 5 observations normales (scores faibles)\n\n")
+  top5_low <- test_temp[order(test_temp$anomaly_score), ][1:5, ]
+  
+  for(i in 1:nrow(top5_low)) {
+    ligne_idx <- as.numeric(rownames(top5_low)[i])
+    ecarts <- as.numeric(test_clean[ligne_idx, ]) - medians_ref
+    ecarts_percent <- (ecarts / medians_ref) * 100
+    
+    max_deviation <- max(abs(ecarts_percent), na.rm = TRUE)
+    
+    cat("**Ligne ", rownames(top5_low)[i], "** (Score: ", 
+        round(top5_low$anomaly_score[i], 4), 
+        ") - Écart max: ", round(max_deviation, 1), "%\n\n", sep = "")
+  }
+  
+  cat("---\n\n")
   
   # Statistiques des scores
-  cat("#### Statistiques des scores\n")
-  cat("- Moyenne:", round(mean(scores), 4), "\n")
-  cat("- Médiane:", round(median(scores), 4), "\n")
-  cat("- Écart-type:", round(sd(scores), 4), "\n")
-  cat("- Min:", round(min(scores), 4), "| Max:", round(max(scores), 4), "\n")
-  cat("- Range:", round(max(scores) - min(scores), 4), "\n\n")
+  cat("#### Statistiques descriptives\n\n")
+  stats_df <- data.frame(
+    Métrique = c("Moyenne", "Médiane", "Écart-type", "Minimum", "Maximum", "Range"),
+    Valeur = c(
+      round(mean(scores), 4),
+      round(median(scores), 4),
+      round(sd(scores), 4),
+      round(min(scores), 4),
+      round(max(scores), 4),
+      round(max(scores) - min(scores), 4)
+    )
+  )
+  print(knitr::kable(stats_df, row.names = FALSE))
+  cat("\n")
   
-  # Vérifier si les top anomalies sont dans outliers_detected
+  # Concordance IQR
   indices_high <- as.numeric(rownames(top5_high))
   in_outliers_high <- sum(indices_high %in% outliers_detected_test)
-  cat("Parmi le top 5, ", in_outliers_high, " sont des outliers détectés (IQR)\n\n")
+  cat("**Concordance IQR :** ", in_outliers_high, " / 5 des top anomalies sont des outliers IQR\n\n", sep = "")
+  cat("---\n\n")
   
   return(scores)
 }
@@ -579,17 +636,20 @@ analyze_model <- function(params, model_name) {
 scores_best1 <- analyze_model(best_model_1, "Meilleur modèle")
 scores_best2 <- analyze_model(best_model_2, "2ème meilleur modèle")
 scores_worst <- analyze_model(worst_model, "Pire modèle")
+```
 
-# Comparaison graphique (2 plots seulement)
+
+```{r, fig.width=10, fig.height=5, fig.cap="Comparaison des distributions de scores"}
 par(mfrow = c(1, 2))
 
 # Plot 1: Distribution des scores
 boxplot(list(Meilleur = scores_best1, 
-             Deuxieme = scores_best2, 
+             `2ème` = scores_best2, 
              Pire = scores_worst),
         col = c("lightgreen", "lightblue", "lightcoral"),
         main = "Distribution des scores d'anomalie",
-        ylab = "Score")
+        ylab = "Score d'anomalie",
+        las = 1)
 
 # Plot 2: Variance des scores
 variances <- c(var(scores_best1), var(scores_best2), var(scores_worst))
@@ -597,20 +657,42 @@ barplot(variances,
         names.arg = c("Meilleur", "2ème", "Pire"),
         col = c("lightgreen", "lightblue", "lightcoral"),
         main = "Variance des scores",
-        ylab = "Variance")
+        ylab = "Variance",
+        las = 1,
+        ylim = c(0, max(variances) * 1.1))
+text(x = c(0.7, 1.9, 3.1), 
+     y = variances + max(variances) * 0.03, 
+     labels = round(variances, 5),
+     cex = 0.8)
 
 par(mfrow = c(1, 1))
-
-# Analyse comparative finale
-cat("\n### Analyse comparative\n")
-cat("**Variance des scores:**\n")
-cat("- Meilleur modèle:", round(var(scores_best1), 6), "\n")
-cat("- 2ème modèle:", round(var(scores_best2), 6), "\n")
-cat("- Pire modèle:", round(var(scores_worst), 6), "\n\n")
-
-cat("**Interprétation:**\n")
-cat("Une variance plus élevée indique une meilleure séparation entre anomalies et données normales.\n")
-cat("Les meilleurs modèles devraient avoir un range plus large et mieux identifier les outliers IQR.\n")
 ```
+
+```{r}
+cat("\n## Analyse comparative finale\n\n")
+
+# Tableau de comparaison
+comp_df <- data.frame(
+  Modèle = c("Meilleur", "2ème", "Pire"),
+  Variance = round(c(var(scores_best1), var(scores_best2), var(scores_worst)), 6),
+  Range = round(c(
+    max(scores_best1) - min(scores_best1),
+    max(scores_best2) - min(scores_best2),
+    max(scores_worst) - min(scores_worst)
+  ), 4),
+  F1_score = round(c(best_model_1$f1_score, best_model_2$f1_score, worst_model$f1_score), 3)
+)
+
+knitr::kable(comp_df, 
+             caption = "Comparaison des métriques clés",
+             align = c("l", "r", "r", "r"))
+
+cat("\n**Interprétation :**\n\n")
+cat("- Une **variance élevée** indique une meilleure séparation entre anomalies et données normales\n")
+cat("- Un **range large** suggère une discrimination claire des valeurs extrêmes\n")
+cat("- Le **F1-score** mesure la concordance avec les outliers IQR (≥3 features aberrantes)\n\n")
+cat("Les meilleurs modèles combinent haute variance, range large et bon F1-score, confirmant leur capacité à identifier de véritables anomalies multivariées.\n")
+```
+
 
 

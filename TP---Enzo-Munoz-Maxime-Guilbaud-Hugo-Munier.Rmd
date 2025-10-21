@@ -52,7 +52,7 @@ library(rpart.plot)
 ```{r}
 # Importation des données
 
-data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Arbres de décision et forêts aléatoires/TP/7 bank_marketing.csv", 
+data <- read.csv("7 bank_marketing.csv", 
                  sep=";", header=TRUE)
 head(data)
 summary(data)
@@ -79,8 +79,7 @@ data[factor_vars] <- lapply(data[factor_vars], as.factor)
 numeric_vars <- c("balance", "age")
 data[numeric_vars] <- lapply(data[numeric_vars], as.numeric)
 
-# Vérification
-str(data)
+
 summary(data)
 ```
 Afin de pouvoir exploiter correctement l’ensemble des variables dans R, les variables catégorielles ont été converties en facteurs, tandis que les variables quantitatives ont été transformées en numériques.

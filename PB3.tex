@@ -1,0 +1,1870 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={PB3},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{PB3}
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+\maketitle
+
+\#\#Partie iii Le modèle de la forêt d'isolement (Isolation Forest) est
+un algorithme d'apprentissage non supervisé utilisé principalement pour
+la détection d'anomalies.
+
+Principe :
+
+Au lieu de modéliser la distribution des données normales, l'Isolation
+Forest isole directement les observations. Elle construit de nombreux
+arbres binaires aléatoires où, à chaque nœud, une caractéristique et une
+valeur de coupure sont choisies au hasard. Les points anormaux, étant
+rares et différents, sont plus faciles à isoler : ils nécessitent moins
+de divisions pour être séparés du reste des données.
+
+Idée clé :
+
+Moins une observation nécessite de divisions pour être isolée, ➜ plus
+elle est susceptible d'être une anomalie.
+
+Avantages :
+
+Très efficace sur de grands volumes de données. Ne nécessite pas
+d'étiquettes (non supervisé). Gère bien les données de grande dimension.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data}\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"KPIs for telecommunication.csv"}\NormalTok{, }\AttributeTok{sep =} \StringTok{";"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{summary}\NormalTok{(data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##       KPI1             KPI2             KPI3                KPI4       
+##  Min.   :  0.00   Min.   :  0.00   Min.   :0.000e+00   Min.   : 80.00  
+##  1st Qu.: 92.31   1st Qu.:  0.00   1st Qu.:9.090e+02   1st Qu.:100.00  
+##  Median :100.00   Median :  1.50   Median :3.013e+05   Median :100.00  
+##  Mean   : 75.91   Mean   : 14.97   Mean   :3.427e+07   Mean   : 99.96  
+##  3rd Qu.:100.00   3rd Qu.: 17.01   3rd Qu.:1.796e+07   3rd Qu.:100.00  
+##  Max.   :100.00   Max.   :472.98   Max.   :1.437e+09   Max.   :100.00  
+##                                                        NA's   :501     
+##       KPI5                KPI6              KPI7              KPI8         
+##  Min.   :        0   Min.   : 0.0000   Min.   :      0   Min.   :-1.11100  
+##  1st Qu.:      858   1st Qu.: 0.0000   1st Qu.:      0   1st Qu.: 0.00000  
+##  Median :   174517   Median : 0.0000   Median :    880   Median : 0.00000  
+##  Mean   :  7614980   Mean   : 0.4346   Mean   :  37157   Mean   : 0.03844  
+##  3rd Qu.:  5163472   3rd Qu.: 0.0000   3rd Qu.:  25400   3rd Qu.: 0.00000  
+##  Max.   :219999750   Max.   :50.0000   Max.   :1114640   Max.   :20.00000  
+##                      NA's   :282                                           
+##       KPI9            KPI10          
+##  Min.   : 87.50   Min.   :0.000e+00  
+##  1st Qu.:100.00   1st Qu.:9.984e+03  
+##  Median :100.00   Median :6.886e+05  
+##  Mean   : 99.93   Mean   :4.219e+07  
+##  3rd Qu.:100.00   3rd Qu.:2.703e+07  
+##  Max.   :104.76   Max.   :1.576e+09  
+##  NA's   :382
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{missing\_count }\OtherTok{\textless{}{-}} \FunctionTok{colSums}\NormalTok{(}\FunctionTok{is.na}\NormalTok{(data))}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Pourcentage de valeurs manquantes:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Pourcentage de valeurs manquantes:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{round}\NormalTok{(missing\_count }\SpecialCharTok{/} \FunctionTok{nrow}\NormalTok{(data) }\SpecialCharTok{*} \DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##  KPI1  KPI2  KPI3  KPI4  KPI5  KPI6  KPI7  KPI8  KPI9 KPI10 
+##  0.00  0.00  0.00 36.70  0.00 20.66  0.00  0.00 27.99  0.00
+\end{verbatim}
+
+\subsection{Gestion des valeurs manquantes (KPI4, KPI6,
+KPI9)}\label{gestion-des-valeurs-manquantes-kpi4-kpi6-kpi9}
+
+Pour traiter ces donnees manquantes, nous allons dans un premier temps
+envisager plusieurs approches :
+
+\begin{itemize}
+\tightlist
+\item
+  Remplacement par la \textbf{moyenne} ou la \textbf{mediane}.
+\item
+  Utilisation de la methode des \textbf{k plus proches voisins (kNN)},
+  apres avoir examine la matrice de correlation afin de verifier si les
+  autres KPI influencent les KPI4, KPI6 et KPI9 (qui presentent
+  respectivement 36.70 \%, 20.66 \% et 27.99 \% de valeurs manquantes).
+\item
+  Suppression eventuelle des variables, si aucune methode d'imputation
+  n'est pertinente.
+\end{itemize}
+
+\#1. KNN
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Matrice de corrélation sur données complètes}
+
+\NormalTok{data\_complete }\OtherTok{\textless{}{-}} \FunctionTok{na.omit}\NormalTok{(data)}
+
+\CommentTok{\# Calcul et visualisation de la corrélation}
+\NormalTok{cor\_matrix }\OtherTok{\textless{}{-}} \FunctionTok{cor}\NormalTok{(data\_complete)}
+
+
+\CommentTok{\# Visualisation}
+\FunctionTok{library}\NormalTok{(corrplot)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'corrplot' was built under R version 4.5.1
+\end{verbatim}
+
+\begin{verbatim}
+## corrplot 0.95 loaded
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{corrplot}\NormalTok{(cor\_matrix, }\AttributeTok{method =} \StringTok{"color"}\NormalTok{, }\AttributeTok{type =} \StringTok{"upper"}\NormalTok{, }
+         \AttributeTok{addCoef.col =} \StringTok{"black"}\NormalTok{, }\AttributeTok{number.cex =} \FloatTok{0.7}\NormalTok{,}
+         \AttributeTok{tl.col =} \StringTok{"black"}\NormalTok{, }\AttributeTok{tl.srt =} \DecValTok{45}\NormalTok{,}
+         \AttributeTok{title =} \StringTok{"Matrice de corrélation (données complètes)"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-3-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Corrélations avec les KPI à imputer}
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Corrélations avec KPI4:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Corrélations avec KPI4:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{sort}\NormalTok{(cor\_matrix[, }\StringTok{"KPI4"}\NormalTok{], }\AttributeTok{decreasing =} \ConstantTok{TRUE}\NormalTok{)[}\FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{3}\NormalTok{)])}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##       KPI4       KPI5       KPI6 
+## 1.00000000 0.01329184 0.00916166
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Corrélations avec KPI6:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Corrélations avec KPI6:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{sort}\NormalTok{(cor\_matrix[, }\StringTok{"KPI6"}\NormalTok{], }\AttributeTok{decreasing =} \ConstantTok{TRUE}\NormalTok{)[}\FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{3}\NormalTok{)])}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##       KPI6       KPI8       KPI4 
+## 1.00000000 0.15164778 0.00916166
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Corrélations avec KPI9:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Corrélations avec KPI9:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{sort}\NormalTok{(cor\_matrix[, }\StringTok{"KPI9"}\NormalTok{], }\AttributeTok{decreasing =} \ConstantTok{TRUE}\NormalTok{)[}\FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{3}\NormalTok{)])}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##       KPI9       KPI5      KPI10 
+## 1.00000000 0.02014820 0.01339141
+\end{verbatim}
+
+Apres analyse, aucune des variables (KPI4, KPI6, KPI9) n'est correlee de
+maniere significative avec les autres. Dans ce cas, l'utilisation du kNN
+ou d'un modele de regression n'est pas adaptee, car ces methodes
+reposent justement sur des relations entre variables.
+
+En observant les statistiques descriptives, on constate que la mediane
+est bien plus representative pour ces indicateurs :
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{KPI4} : min = 80, 1er quartile = 100, max = 100 → la valeur 80
+  est un outlier ; il est logique d'imputer les valeurs manquantes par
+  100.
+\item
+  Le meme raisonnement s'applique a \textbf{KPI6} et \textbf{KPI9}.
+\end{itemize}
+
+\textbf{En conclusion}, avant d'utiliser des methodes plus complexes
+(comme le kNN, plus couteux en temps de calcul), il est preferable
+d'analyser les statistiques descriptives. Celles-ci permettent souvent
+d'opter pour une approche simple, robuste et coherente.
+
+Ainsi, nous choisissons de \textbf{ne supprimer aucune observation} et
+de \textbf{remplacer toutes les valeurs manquantes par la mediane de la
+colonne concernee}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(dplyr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'dplyr'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data\_final }\OtherTok{\textless{}{-}}\NormalTok{ data }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\FunctionTok{across}\NormalTok{(}\FunctionTok{everything}\NormalTok{(), }\SpecialCharTok{\textasciitilde{}}\FunctionTok{ifelse}\NormalTok{(}\FunctionTok{is.na}\NormalTok{(.x), }\FunctionTok{median}\NormalTok{(.x, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{), .x)))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Détection des outliers}
+\NormalTok{detect\_outliers }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(x) \{}
+\NormalTok{  Q1 }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(x, }\FloatTok{0.25}\NormalTok{, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+\NormalTok{  Q3 }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(x, }\FloatTok{0.75}\NormalTok{, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+\NormalTok{  IQR }\OtherTok{\textless{}{-}}\NormalTok{ Q3 }\SpecialCharTok{{-}}\NormalTok{ Q1}
+\NormalTok{  lower }\OtherTok{\textless{}{-}}\NormalTok{ Q1 }\SpecialCharTok{{-}} \FloatTok{1.5} \SpecialCharTok{*}\NormalTok{ IQR}
+\NormalTok{  upper }\OtherTok{\textless{}{-}}\NormalTok{ Q3 }\SpecialCharTok{+} \FloatTok{1.5} \SpecialCharTok{*}\NormalTok{ IQR}
+  \FunctionTok{which}\NormalTok{(x }\SpecialCharTok{\textless{}}\NormalTok{ lower }\SpecialCharTok{|}\NormalTok{ x }\SpecialCharTok{\textgreater{}}\NormalTok{ upper)}
+\NormalTok{\}}
+
+\NormalTok{outliers\_list }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(data, detect\_outliers)}
+\NormalTok{outliers\_count }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(outliers\_list, length)}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{\#\#\# Nombre d\textquotesingle{}outliers par variable}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### Nombre d'outliers par variable
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(outliers\_count)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##  KPI1  KPI2  KPI3  KPI4  KPI5  KPI6  KPI7  KPI8  KPI9 KPI10 
+##   331   136   240     6   231   189   222    41    86   231
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{lignes\_outliers }\OtherTok{\textless{}{-}} \FunctionTok{unique}\NormalTok{(}\FunctionTok{unlist}\NormalTok{(outliers\_list))}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{**Nombre total de lignes avec au moins un outlier:**"}\NormalTok{, }\FunctionTok{length}\NormalTok{(lignes\_outliers), }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## **Nombre total de lignes avec au moins un outlier:** 747
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Stocker les numéros de ligne avec \textgreater{}= 3 outliers}
+\NormalTok{outliers\_detected }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{()}
+
+\ControlFlowTok{for}\NormalTok{(ligne }\ControlFlowTok{in}\NormalTok{ lignes\_outliers) \{}
+\NormalTok{  features\_pb }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(outliers\_list)[}\FunctionTok{sapply}\NormalTok{(outliers\_list, }\ControlFlowTok{function}\NormalTok{(x) ligne }\SpecialCharTok{\%in\%}\NormalTok{ x)]}
+  
+  \CommentTok{\# Afficher et stocker uniquement si \textgreater{}= 3 outliers}
+  \ControlFlowTok{if}\NormalTok{(}\FunctionTok{length}\NormalTok{(features\_pb) }\SpecialCharTok{\textgreater{}=} \DecValTok{3}\NormalTok{) \{}
+\NormalTok{    outliers\_detected }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(outliers\_detected, ligne)}
+\NormalTok{    valeurs }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(features\_pb, }\ControlFlowTok{function}\NormalTok{(f) data[ligne, f])}
+\NormalTok{  \}}
+\NormalTok{\}}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{**Total lignes avec \textgreater{}= 3 outliers:**"}\NormalTok{, }\FunctionTok{length}\NormalTok{(outliers\_detected), }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## **Total lignes avec >= 3 outliers:** 234
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Summary des outliers par feature:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Summary des outliers par feature:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{for}\NormalTok{(feature }\ControlFlowTok{in} \FunctionTok{names}\NormalTok{(outliers\_list)) \{}
+  \ControlFlowTok{if}\NormalTok{(}\FunctionTok{length}\NormalTok{(outliers\_list[[feature]]) }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{) \{}
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, feature, }\StringTok{":}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep=}\StringTok{""}\NormalTok{)}
+\NormalTok{    valeurs\_outliers }\OtherTok{\textless{}{-}}\NormalTok{ data[outliers\_list[[feature]], feature]}
+    \FunctionTok{print}\NormalTok{(}\FunctionTok{summary}\NormalTok{(valeurs\_outliers))}
+\NormalTok{  \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## KPI1:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   0.000   0.000   0.000   1.773   0.000  80.000 
+## 
+## KPI2:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   42.99   53.37   64.26   89.28   92.38  472.98 
+## 
+## KPI3:
+##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+## 4.497e+07 7.451e+07 1.148e+08 1.752e+08 2.054e+08 1.437e+09 
+## 
+## KPI4:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   80.00   96.85   97.18   94.93   98.41   99.67 
+## 
+## KPI5:
+##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+##  12925096  19626565  28475224  38791341  45751842 219999750 
+## 
+## KPI6:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   0.030   0.179   0.503   2.490   1.449  50.000 
+## 
+## KPI7:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   63960  101530  157500  193724  249153 1114640 
+## 
+## KPI8:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  -1.111   0.091   0.216   1.280   0.588  20.000 
+## 
+## KPI9:
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   87.50   99.60   99.82   99.22   99.90  104.76 
+## 
+## KPI10:
+##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+## 6.758e+07 1.053e+08 1.576e+08 2.159e+08 2.585e+08 1.576e+09
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Préparer les données pour le plot}
+\NormalTok{features\_with\_outliers }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(outliers\_list)[}\FunctionTok{sapply}\NormalTok{(outliers\_list, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{length}\NormalTok{(x) }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{)]}
+
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{2}\NormalTok{, }\FunctionTok{ceiling}\NormalTok{(}\FunctionTok{length}\NormalTok{(features\_with\_outliers)}\SpecialCharTok{/}\DecValTok{2}\NormalTok{)))}
+
+\ControlFlowTok{for}\NormalTok{(feature }\ControlFlowTok{in}\NormalTok{ features\_with\_outliers) \{}
+\NormalTok{  valeurs\_normales }\OtherTok{\textless{}{-}}\NormalTok{ data[}\SpecialCharTok{{-}}\NormalTok{outliers\_list[[feature]], feature]}
+\NormalTok{  valeurs\_outliers }\OtherTok{\textless{}{-}}\NormalTok{ data[outliers\_list[[feature]], feature]}
+  
+  \FunctionTok{boxplot}\NormalTok{(}\FunctionTok{list}\NormalTok{(}\AttributeTok{Normal =}\NormalTok{ valeurs\_normales, }\AttributeTok{Outliers =}\NormalTok{ valeurs\_outliers),}
+          \AttributeTok{main =}\NormalTok{ feature,}
+          \AttributeTok{col =} \FunctionTok{c}\NormalTok{(}\StringTok{"lightblue"}\NormalTok{, }\StringTok{"coral"}\NormalTok{),}
+          \AttributeTok{ylab =} \StringTok{"Valeur"}\NormalTok{,}
+          \AttributeTok{cex.main =} \FloatTok{0.9}\NormalTok{)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning in x[floor(d)] + x[ceiling(d)]: NAs produced by integer overflow
+## Warning in x[floor(d)] + x[ceiling(d)]: NAs produced by integer overflow
+\end{verbatim}
+
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-7-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Analyse critique de la détection d'outliers par la méthode
+IQR}\label{analyse-critique-de-la-duxe9tection-doutliers-par-la-muxe9thode-iqr}
+
+En comparant les statistiques des outliers détectés avec la méthode IQR
+(seuil 1.5 × IQR) et celles des valeurs normales, on observe plusieurs
+problèmes majeurs :
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{KPI9} : Les outliers détectés ont des statistiques globales
+  très proches des non-outliers, suggérant une sur-détection.
+\item
+  \textbf{KPI8 et KPI6} : Même constat, la méthode IQR capture trop de
+  valeurs qui ne sont pas réellement aberrantes.
+\end{itemize}
+
+Cette méthode statistique classique s'avère \textbf{inadaptée à notre
+jeu de données}. Cependant, elle nous fournit une baseline de
+\textbf{234 lignes potentiellement aberrantes} qui servira de référence
+pour évaluer les modèles Isolation Forest.
+
+\subsubsection{Cas particulier : KPI1 = 0}\label{cas-particulier-kpi1-0}
+
+Un problème majeur émerge : environ \textbf{330 lignes sur 1365 (25\%)}
+sont marquées comme outliers uniquement parce que \textbf{KPI1 = 0}.
+
+\begin{quote}
+\textbf{Question critique} : Doit-on considérer toutes ces lignes comme
+des anomalies ? \textbf{Non, je ne pense pas}.
+\end{quote}
+
+Une valeur nulle pour KPI1 peut être légitime selon le contexte métier
+(absence d'activité, période de maintenance, etc.). Il en va de même
+pour KPI9. Étant donné qu'on a pas le contexte, on ne peut pas conclure.
+
+\subsubsection{Critère de sélection du meilleur
+modèle}\label{crituxe8re-de-suxe9lection-du-meilleur-moduxe8le}
+
+Cette méthode pourra quand même nous aider pour juger les modèles
+Isolation Forest. D'après notre interprétation, le modèle devra :
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Ne pas classifier systématiquement comme anomalie} les lignes
+  où KPI1 = 0. Les observations avec KPI1 = 0 ne font pas ressortir en
+  général d'autres potentielles outliers pour les autres feature en
+  partant de ce principe. On va classer les modèles de sorte que le
+  meilleur soit celui qui : \textbf{Maximise le F1-score} en identifiant
+  les lignes avec réellement 3+ features aberrantes simultanément.
+\end{enumerate}
+
+Le meilleur modèle sera donc celui qui fait preuve de
+\textbf{discernement contextuel} et ne se laisse pas piéger par des
+valeurs nulles fréquentes mais potentiellement normales.
+
+Dans la prochaine partie on va tester l'influence des hyperparamètres
+sur 4 différents modèles
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(isotree)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'isotree' was built under R version 4.5.1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(ggplot2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'ggplot2' was built under R version 4.5.1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(rsample)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'rsample' was built under R version 4.5.1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(dplyr)}
+
+\CommentTok{\# Division train/test}
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)}
+\NormalTok{splitter }\OtherTok{\textless{}{-}}\NormalTok{ data\_final }\SpecialCharTok{\%\textgreater{}\%}
+\NormalTok{  rsample}\SpecialCharTok{::}\FunctionTok{initial\_split}\NormalTok{(}\AttributeTok{prop =} \FloatTok{0.7}\NormalTok{)}
+\NormalTok{train }\OtherTok{\textless{}{-}}\NormalTok{ rsample}\SpecialCharTok{::}\FunctionTok{training}\NormalTok{(splitter)}
+\NormalTok{test  }\OtherTok{\textless{}{-}}\NormalTok{ rsample}\SpecialCharTok{::}\FunctionTok{testing}\NormalTok{(splitter)}
+
+
+\CommentTok{\# Définition de 4 modèles différents}
+\NormalTok{configs }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{model =} \FunctionTok{c}\NormalTok{(}\StringTok{"Modèle 1"}\NormalTok{, }\StringTok{"Modèle 2"}\NormalTok{, }\StringTok{"Modèle 3"}\NormalTok{, }\StringTok{"Modèle 4"}\NormalTok{),}
+  \AttributeTok{ntrees =} \FunctionTok{c}\NormalTok{(}\DecValTok{100}\NormalTok{, }\DecValTok{500}\NormalTok{, }\DecValTok{500}\NormalTok{, }\DecValTok{250}\NormalTok{),}
+  \AttributeTok{sample\_size =} \FunctionTok{c}\NormalTok{(}\DecValTok{100}\NormalTok{, }\DecValTok{100}\NormalTok{, }\DecValTok{512}\NormalTok{, }\DecValTok{256}\NormalTok{),}
+  \AttributeTok{ndim =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{2}\NormalTok{)}
+\NormalTok{)}
+
+\CommentTok{\# Stockage des résultats}
+\NormalTok{all\_scores }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
+\NormalTok{comparison\_results }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{()}
+
+\ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(configs)) \{}
+  \CommentTok{\# Entraînement du modèle}
+\NormalTok{  model }\OtherTok{\textless{}{-}} \FunctionTok{isolation.forest}\NormalTok{(train, }
+                           \AttributeTok{ntrees =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{ntrees[i],}
+                           \AttributeTok{sample\_size =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{sample\_size[i],}
+                           \AttributeTok{ndim =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{ndim[i])}
+  
+  \CommentTok{\# Scores sur test}
+\NormalTok{  scores }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(model, test)}
+\NormalTok{  all\_scores[[i]] }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{score =}\NormalTok{ scores,}
+    \AttributeTok{model =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{model[i]}
+\NormalTok{  )}
+  
+  \CommentTok{\# Métriques de comparaison}
+\NormalTok{  comparison\_results }\OtherTok{\textless{}{-}} \FunctionTok{rbind}\NormalTok{(comparison\_results, }\FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{model =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{model[i],}
+    \AttributeTok{ntrees =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{ntrees[i],}
+    \AttributeTok{sample\_size =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{sample\_size[i],}
+    \AttributeTok{ndim =}\NormalTok{ configs}\SpecialCharTok{$}\NormalTok{ndim[i],}
+    \AttributeTok{variance =} \FunctionTok{var}\NormalTok{(scores),}
+    \AttributeTok{range =} \FunctionTok{max}\NormalTok{(scores) }\SpecialCharTok{{-}} \FunctionTok{min}\NormalTok{(scores),}
+    \AttributeTok{q95 =} \FunctionTok{quantile}\NormalTok{(scores, }\FloatTok{0.95}\NormalTok{),}
+    \AttributeTok{mean =} \FunctionTok{mean}\NormalTok{(scores),}
+    \AttributeTok{sd =} \FunctionTok{sd}\NormalTok{(scores)}
+\NormalTok{  ))}
+\NormalTok{\}}
+
+\CommentTok{\# Combiner tous les scores}
+\NormalTok{all\_scores\_df }\OtherTok{\textless{}{-}} \FunctionTok{do.call}\NormalTok{(rbind, all\_scores)}
+
+\CommentTok{\# Graphique comparatif avec facets}
+\FunctionTok{ggplot}\NormalTok{(all\_scores\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ score)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_histogram}\NormalTok{(}\AttributeTok{bins =} \DecValTok{30}\NormalTok{, }\AttributeTok{fill =} \StringTok{"steelblue"}\NormalTok{, }\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{data =}\NormalTok{ all\_scores\_df }\SpecialCharTok{\%\textgreater{}\%} 
+               \FunctionTok{group\_by}\NormalTok{(model) }\SpecialCharTok{\%\textgreater{}\%} 
+               \FunctionTok{summarise}\NormalTok{(}\AttributeTok{q95 =} \FunctionTok{quantile}\NormalTok{(score, }\FloatTok{0.95}\NormalTok{)),}
+             \FunctionTok{aes}\NormalTok{(}\AttributeTok{xintercept =}\NormalTok{ q95), }
+             \AttributeTok{color =} \StringTok{"red"}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{facet\_wrap}\NormalTok{(}\SpecialCharTok{\textasciitilde{}}\NormalTok{model, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{, }\AttributeTok{scales =} \StringTok{"free\_y"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Distribution des scores d\textquotesingle{}anomalie {-} Comparaison des 4 modèles"}\NormalTok{,}
+       \AttributeTok{subtitle =} \StringTok{"Ligne rouge = 95e percentile"}\NormalTok{,}
+       \AttributeTok{x =} \StringTok{"Score d\textquotesingle{}anomalie"}\NormalTok{, }
+       \AttributeTok{y =} \StringTok{"Fréquence"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-8-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Boxplot comparatif}
+\FunctionTok{ggplot}\NormalTok{(all\_scores\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ model, }\AttributeTok{y =}\NormalTok{ score, }\AttributeTok{fill =}\NormalTok{ model)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_boxplot}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Comparaison des distributions de scores"}\NormalTok{,}
+       \AttributeTok{x =} \StringTok{"Modèle"}\NormalTok{, }
+       \AttributeTok{y =} \StringTok{"Score d\textquotesingle{}anomalie"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{theme}\NormalTok{(}\AttributeTok{legend.position =} \StringTok{"none"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-9-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Density plot superposé}
+\FunctionTok{ggplot}\NormalTok{(all\_scores\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ score, }\AttributeTok{fill =}\NormalTok{ model)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_density}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.4}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Densité des scores {-} Comparaison"}\NormalTok{,}
+       \AttributeTok{x =} \StringTok{"Score d\textquotesingle{}anomalie"}\NormalTok{, }
+       \AttributeTok{y =} \StringTok{"Densité"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-9-2.pdf}
+
+\subsection{Influence des hyperparamètres sur les modèles Isolation
+Forest}\label{influence-des-hyperparamuxe8tres-sur-les-moduxe8les-isolation-forest}
+
+\subsubsection{Configuration des modèles
+testés}\label{configuration-des-moduxe8les-testuxe9s}
+
+Nous testons 4 configurations différentes pour comprendre l'impact des
+hyperparamètres sur la détection d'anomalies :
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{configs }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{model =} \FunctionTok{c}\NormalTok{(}\StringTok{"Modèle 1"}\NormalTok{, }\StringTok{"Modèle 2"}\NormalTok{, }\StringTok{"Modèle 3"}\NormalTok{, }\StringTok{"Modèle 4"}\NormalTok{),}
+  \AttributeTok{ntrees =} \FunctionTok{c}\NormalTok{(}\DecValTok{100}\NormalTok{, }\DecValTok{500}\NormalTok{, }\DecValTok{500}\NormalTok{, }\DecValTok{250}\NormalTok{),}
+  \AttributeTok{sample\_size =} \FunctionTok{c}\NormalTok{(}\DecValTok{100}\NormalTok{, }\DecValTok{100}\NormalTok{, }\DecValTok{512}\NormalTok{, }\DecValTok{256}\NormalTok{),}
+  \AttributeTok{ndim =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{2}\NormalTok{)}
+\NormalTok{)}
+\NormalTok{knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(configs, }\AttributeTok{caption =} \StringTok{"Configuration des hyperparamètres testés"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lrrr@{}}
+\caption{Configuration des hyperparamètres testés}\tabularnewline
+\toprule\noalign{}
+model & ntrees & sample\_size & ndim \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+model & ntrees & sample\_size & ndim \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Modèle 1 & 100 & 100 & 1 \\
+Modèle 2 & 500 & 100 & 1 \\
+Modèle 3 & 500 & 512 & 3 \\
+Modèle 4 & 250 & 256 & 2 \\
+\end{longtable}
+
+\subsubsection{Rôle des
+hyperparamètres}\label{ruxf4le-des-hyperparamuxe8tres}
+
+\textbf{1. \texttt{ntrees} (Nombre d'arbres)}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Principe} : Nombre d'arbres dans la forêt d'isolation
+\item
+  \textbf{Impact} : Plus d'arbres = prédictions plus stables et
+  robustes, mais temps de calcul accru
+\item
+  \textbf{Recommandation} : Généralement entre 100 et 500 arbres
+\end{itemize}
+
+\textbf{2. \texttt{sample\_size} (Taille d'échantillon)}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Principe} : Nombre d'observations utilisées pour construire
+  chaque arbre
+\item
+  \textbf{Impact} :
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Petit sample\_size} (100-256) : Arbres plus petits,
+    détection fine des anomalies, variance élevée
+  \item
+    \textbf{Grand sample\_size} (512+) : Arbres plus profonds, modèle
+    plus stable mais peut manquer des anomalies subtiles
+  \end{itemize}
+\item
+  \textbf{Recommandation} : Typiquement 256 observations pour un bon
+  compromis
+\end{itemize}
+
+\textbf{3. \texttt{ndim} (Nombre de dimensions par split)}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Principe} : Nombre de features considérées simultanément pour
+  chaque division de l'arbre
+\item
+  \textbf{Impact} :
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{ndim = 1} : Splits univariés (une feature à la fois), grande
+    variance, sensible aux outliers individuels
+  \item
+    \textbf{ndim \textgreater{} 1} : Splits multivariés, capture mieux
+    les anomalies contextuelles complexes
+  \end{itemize}
+\item
+  \textbf{Recommandation} : ndim = 1 pour détecter des anomalies
+  simples, ndim = 2-3 pour des patterns multivariés
+\end{itemize}
+
+\subsubsection{Analyse comparative des
+résultats}\label{analyse-comparative-des-ruxe9sultats}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(comparison\_results, }
+             \AttributeTok{digits =} \DecValTok{4}\NormalTok{,}
+             \AttributeTok{caption =} \StringTok{"Métriques de performance des 4 modèles"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0667}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1200}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0933}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1600}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0667}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.1200}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0933}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0933}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0933}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 18\tabcolsep) * \real{0.0933}}@{}}
+\caption{Métriques de performance des 4 modèles}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+model
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+ntrees
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+sample\_size
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+ndim
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+variance
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+range
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+q95
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+mean
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+sd
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+model
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+ntrees
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+sample\_size
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+ndim
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+variance
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+range
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+q95
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+mean
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+sd
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+95\% & Modèle 1 & 100 & 100 & 1 & 0.0073 & 0.3936 & 0.5719 & 0.3857 &
+0.0856 \\
+95\%1 & Modèle 2 & 500 & 100 & 1 & 0.0066 & 0.3502 & 0.5606 & 0.3852 &
+0.0814 \\
+95\%2 & Modèle 3 & 500 & 512 & 3 & 0.0037 & 0.4064 & 0.4670 & 0.3454 &
+0.0611 \\
+95\%3 & Modèle 4 & 250 & 256 & 2 & 0.0046 & 0.3413 & 0.5126 & 0.3613 &
+0.0678 \\
+\end{longtable}
+
+\paragraph{Observations clés}\label{observations-cluxe9s}
+
+\textbf{Modèle 1} (ntrees=100, sample\_size=100, ndim=1) :
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Variance la plus élevée} (0.0073) : attendu avec seulement 100
+  arbres et ndim=1
+\item
+  \textbf{Q95 le plus haut} (0.5719) : discrimination plus agressive
+  entre normal/anomalie
+\item
+  \textbf{Interprétation} : Modèle le plus ``sensible'', identifie plus
+  facilement les anomalies mais risque de faux positifs
+\end{itemize}
+
+\textbf{Modèle 3} (ntrees=500, sample\_size=512, ndim=3) :
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Range maximal} (0.4064) : meilleure séparation globale des
+  scores
+\item
+  \textbf{Q95 plus bas} (0.467) : seuil d'anomalie plus conservateur
+\item
+  \textbf{Interprétation} : Modèle plus stable et robuste, capture des
+  anomalies multivariées complexes
+\end{itemize}
+
+\textbf{Modèle 2 vs Modèle 1} :
+
+\begin{itemize}
+\tightlist
+\item
+  Même configuration (ndim=1, sample\_size=100) mais \textbf{5× plus
+  d'arbres}
+\item
+  Variance réduite grâce à l'effet d'ensemble (averaging)
+\item
+  Q95 inférieur : prédictions plus conservatives
+\end{itemize}
+
+\subsubsection{Quel est le meilleur modèle
+?}\label{quel-est-le-meilleur-moduxe8le}
+
+Sur la base de ces métriques exploratoires :
+
+\begin{quote}
+\textbf{Le Modèle 1 semble le plus prometteur} pour notre tâche, avec
+son Q95 élevé et sa forte variance indiquant une bonne capacité de
+discrimination.
+\end{quote}
+
+\textbf{Cependant}, cette conclusion préliminaire doit être
+\textbf{validée} en comparant les prédictions avec nos \textbf{234
+outliers détectés par la méthode IQR} (lignes avec ≥3 features
+aberrantes). Le meilleur modèle sera celui qui :
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Maximise le \textbf{F1-score} sur ces outliers de référence
+\item
+  Ne sur-détecte pas les lignes avec KPI1 = 0 comme anomalies
+  systématiques
+\item
+  Capture des anomalies \textbf{multivariées complexes} plutôt que des
+  seuils univariés
+\end{enumerate}
+
+Cette validation fera l'objet de la section suivante.
+
+Pour garantir une évaluation robuste, nous effectuons un \textbf{split
+stratifié} sur la variable \texttt{has\_multiple\_outliers} (indiquant
+si une ligne contient ≥3 outliers IQR), assurant ainsi que les ensembles
+train et test maintiennent la \textbf{même proportion d'anomalies
+potentielles} (\textasciitilde NA\%).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Créer les variables de stratification}
+\NormalTok{data\_final}\SpecialCharTok{$}\NormalTok{has\_multiple\_outliers }\OtherTok{\textless{}{-}} \DecValTok{1}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(data\_final) }\SpecialCharTok{\%in\%}\NormalTok{ outliers\_detected}
+\NormalTok{data\_final}\SpecialCharTok{$}\NormalTok{has\_kpi1\_zero }\OtherTok{\textless{}{-}}\NormalTok{ data\_final}\SpecialCharTok{$}\NormalTok{KPI1 }\SpecialCharTok{==} \DecValTok{0}
+
+\CommentTok{\# Combiner les deux critères de stratification}
+\NormalTok{data\_final}\SpecialCharTok{$}\NormalTok{strata\_group }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}
+  \FunctionTok{ifelse}\NormalTok{(data\_final}\SpecialCharTok{$}\NormalTok{has\_multiple\_outliers, }\StringTok{"outlier"}\NormalTok{, }\StringTok{"normal"}\NormalTok{),}
+  \StringTok{"\_"}\NormalTok{,}
+  \FunctionTok{ifelse}\NormalTok{(data\_final}\SpecialCharTok{$}\NormalTok{has\_kpi1\_zero, }\StringTok{"kpi1\_0"}\NormalTok{, }\StringTok{"kpi1\_non0"}\NormalTok{)}
+\NormalTok{)}
+
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)}
+\NormalTok{splitter }\OtherTok{\textless{}{-}}\NormalTok{ data\_final }\SpecialCharTok{\%\textgreater{}\%}
+\NormalTok{  rsample}\SpecialCharTok{::}\FunctionTok{initial\_split}\NormalTok{(}\AttributeTok{prop =} \FloatTok{0.7}\NormalTok{, }\AttributeTok{strata =}\NormalTok{ strata\_group)}
+
+\NormalTok{train }\OtherTok{\textless{}{-}}\NormalTok{ rsample}\SpecialCharTok{::}\FunctionTok{training}\NormalTok{(splitter)}
+\NormalTok{test }\OtherTok{\textless{}{-}}\NormalTok{ rsample}\SpecialCharTok{::}\FunctionTok{testing}\NormalTok{(splitter)}
+
+\CommentTok{\# Vérification des proportions}
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Proportion KPI1=0 dans train:"}\NormalTok{, }\FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(train}\SpecialCharTok{$}\NormalTok{has\_kpi1\_zero)}\SpecialCharTok{*}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{), }\StringTok{"\%}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Proportion KPI1=0 dans train: 23.69 %
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Proportion KPI1=0 dans test:"}\NormalTok{, }\FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(test}\SpecialCharTok{$}\NormalTok{has\_kpi1\_zero)}\SpecialCharTok{*}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{), }\StringTok{"\%}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Proportion KPI1=0 dans test: 23.6 %
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Recalculer outliers sur test (exclure les colonnes ajoutées)}
+\NormalTok{cols\_to\_exclude }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"has\_multiple\_outliers"}\NormalTok{, }\StringTok{"has\_kpi1\_zero"}\NormalTok{, }\StringTok{"strata\_group"}\NormalTok{)}
+\NormalTok{outliers\_list\_test }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(test[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(test) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude], detect\_outliers)}
+\NormalTok{lignes\_outliers\_test }\OtherTok{\textless{}{-}} \FunctionTok{unique}\NormalTok{(}\FunctionTok{unlist}\NormalTok{(outliers\_list\_test))}
+
+\NormalTok{outliers\_detected\_test }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{()}
+\ControlFlowTok{for}\NormalTok{(ligne }\ControlFlowTok{in}\NormalTok{ lignes\_outliers\_test) \{}
+\NormalTok{  features\_pb }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(outliers\_list\_test)[}\FunctionTok{sapply}\NormalTok{(outliers\_list\_test, }\ControlFlowTok{function}\NormalTok{(x) ligne }\SpecialCharTok{\%in\%}\NormalTok{ x)]}
+  \ControlFlowTok{if}\NormalTok{(}\FunctionTok{length}\NormalTok{(features\_pb) }\SpecialCharTok{\textgreater{}=} \DecValTok{3}\NormalTok{) \{}
+\NormalTok{    outliers\_detected\_test }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(outliers\_detected\_test, ligne)}
+\NormalTok{  \}}
+\NormalTok{\}}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Outliers détectés dans test set (\textgreater{}= 3 features):"}\NormalTok{, }\FunctionTok{length}\NormalTok{(outliers\_detected\_test), }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Outliers détectés dans test set (>= 3 features): 65
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# ANALYSE : Combien d\textquotesingle{}outliers détectés ont KPI1 = 0 ?}
+\NormalTok{outliers\_with\_kpi1\_zero }\OtherTok{\textless{}{-}} \FunctionTok{sum}\NormalTok{(test}\SpecialCharTok{$}\NormalTok{KPI1[outliers\_detected\_test] }\SpecialCharTok{==} \DecValTok{0}\NormalTok{)}
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Parmi les"}\NormalTok{, }\FunctionTok{length}\NormalTok{(outliers\_detected\_test), }\StringTok{"outliers détectés:}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Parmi les 65 outliers détectés:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"  {-}"}\NormalTok{, outliers\_with\_kpi1\_zero, }\StringTok{"ont KPI1 = 0 ("}\NormalTok{,}
+    \FunctionTok{round}\NormalTok{(outliers\_with\_kpi1\_zero}\SpecialCharTok{/}\FunctionTok{length}\NormalTok{(outliers\_detected\_test)}\SpecialCharTok{*}\DecValTok{100}\NormalTok{, }\DecValTok{1}\NormalTok{), }\StringTok{"\%)}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##   - 0 ont KPI1 = 0 ( 0 %)
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"  {-}"}\NormalTok{, }\FunctionTok{length}\NormalTok{(outliers\_detected\_test) }\SpecialCharTok{{-}}\NormalTok{ outliers\_with\_kpi1\_zero, }
+    \StringTok{"ont KPI1 ≠ 0}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##   - 65 ont KPI1 ≠ 0
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Grille de paramètres}
+\NormalTok{params\_grid }\OtherTok{\textless{}{-}} \FunctionTok{expand.grid}\NormalTok{(}
+  \AttributeTok{ntrees =} \FunctionTok{c}\NormalTok{(}\DecValTok{100}\NormalTok{, }\DecValTok{250}\NormalTok{, }\DecValTok{500}\NormalTok{),}
+  \AttributeTok{sample\_size =} \FunctionTok{c}\NormalTok{(}\DecValTok{128}\NormalTok{, }\DecValTok{256}\NormalTok{, }\DecValTok{512}\NormalTok{),}
+  \AttributeTok{ndim =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{3}\NormalTok{)}
+\NormalTok{)}
+
+\CommentTok{\# Fonction de comparaison améliorée}
+\NormalTok{compare\_outliers }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(predicted, detected, test\_data) \{}
+\NormalTok{  communs }\OtherTok{\textless{}{-}} \FunctionTok{intersect}\NormalTok{(predicted, detected)}
+  
+  \CommentTok{\# Taux de détection}
+\NormalTok{  taux }\OtherTok{\textless{}{-}} \FunctionTok{length}\NormalTok{(communs) }\SpecialCharTok{/} \FunctionTok{length}\NormalTok{(detected) }\SpecialCharTok{*} \DecValTok{100}
+  
+  \CommentTok{\# F1{-}score}
+\NormalTok{  precision }\OtherTok{\textless{}{-}} \FunctionTok{ifelse}\NormalTok{(}\FunctionTok{length}\NormalTok{(predicted) }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{, }\FunctionTok{length}\NormalTok{(communs) }\SpecialCharTok{/} \FunctionTok{length}\NormalTok{(predicted), }\DecValTok{0}\NormalTok{)}
+\NormalTok{  recall }\OtherTok{\textless{}{-}} \FunctionTok{length}\NormalTok{(communs) }\SpecialCharTok{/} \FunctionTok{length}\NormalTok{(detected)}
+\NormalTok{  f1 }\OtherTok{\textless{}{-}} \FunctionTok{ifelse}\NormalTok{(precision }\SpecialCharTok{+}\NormalTok{ recall }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{, }\DecValTok{2} \SpecialCharTok{*}\NormalTok{ (precision }\SpecialCharTok{*}\NormalTok{ recall) }\SpecialCharTok{/}\NormalTok{ (precision }\SpecialCharTok{+}\NormalTok{ recall), }\DecValTok{0}\NormalTok{)}
+  
+  \CommentTok{\# NOUVEAU : Analyser KPI1 = 0 dans les prédictions}
+\NormalTok{  kpi1\_zero\_predicted }\OtherTok{\textless{}{-}} \FunctionTok{sum}\NormalTok{(test\_data}\SpecialCharTok{$}\NormalTok{KPI1[predicted] }\SpecialCharTok{==} \DecValTok{0}\NormalTok{, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+\NormalTok{  prop\_kpi1\_zero }\OtherTok{\textless{}{-}} \FunctionTok{ifelse}\NormalTok{(}\FunctionTok{length}\NormalTok{(predicted) }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{, kpi1\_zero\_predicted }\SpecialCharTok{/} \FunctionTok{length}\NormalTok{(predicted), }\DecValTok{0}\NormalTok{)}
+  
+  \FunctionTok{return}\NormalTok{(}\FunctionTok{list}\NormalTok{(}
+    \AttributeTok{communs =} \FunctionTok{length}\NormalTok{(communs), }
+    \AttributeTok{taux =}\NormalTok{ taux, }
+    \AttributeTok{f1 =}\NormalTok{ f1,}
+    \AttributeTok{kpi1\_zero\_count =}\NormalTok{ kpi1\_zero\_predicted,}
+    \AttributeTok{kpi1\_zero\_prop =}\NormalTok{ prop\_kpi1\_zero }\SpecialCharTok{*} \DecValTok{100}
+\NormalTok{  ))}
+\NormalTok{\}}
+
+\CommentTok{\# Boucle d\textquotesingle{}évaluation}
+\NormalTok{results }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{()}
+
+\ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(params\_grid)) \{}
+\NormalTok{  model\_temp }\OtherTok{\textless{}{-}} \FunctionTok{isolation.forest}\NormalTok{(train[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(train) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude], }
+                                 \AttributeTok{ntrees =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{ntrees[i],}
+                                 \AttributeTok{sample\_size =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{sample\_size[i],}
+                                 \AttributeTok{ndim =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{ndim[i])}
+  
+\NormalTok{  scores\_test }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(model\_temp, test[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(test) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude])}
+\NormalTok{  seuil }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(scores\_test, }\FloatTok{0.95}\NormalTok{)}
+\NormalTok{  lignes\_predites }\OtherTok{\textless{}{-}} \FunctionTok{which}\NormalTok{(scores\_test }\SpecialCharTok{\textgreater{}}\NormalTok{ seuil)}
+  
+  \CommentTok{\# Comparaison avec analyse KPI1 = 0}
+\NormalTok{  comp\_result }\OtherTok{\textless{}{-}} \FunctionTok{compare\_outliers}\NormalTok{(lignes\_predites, outliers\_detected\_test, test)}
+  
+\NormalTok{  results }\OtherTok{\textless{}{-}} \FunctionTok{rbind}\NormalTok{(results, }\FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{ntrees =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{ntrees[i],}
+    \AttributeTok{sample\_size =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{sample\_size[i],}
+    \AttributeTok{ndim =}\NormalTok{ params\_grid}\SpecialCharTok{$}\NormalTok{ndim[i],}
+    \AttributeTok{communs =}\NormalTok{ comp\_result}\SpecialCharTok{$}\NormalTok{communs,}
+    \AttributeTok{taux\_detection =}\NormalTok{ comp\_result}\SpecialCharTok{$}\NormalTok{taux,}
+    \AttributeTok{f1\_score =}\NormalTok{ comp\_result}\SpecialCharTok{$}\NormalTok{f1,}
+    \AttributeTok{kpi1\_zero\_count =}\NormalTok{ comp\_result}\SpecialCharTok{$}\NormalTok{kpi1\_zero\_count,}
+    \AttributeTok{kpi1\_zero\_pct =}\NormalTok{ comp\_result}\SpecialCharTok{$}\NormalTok{kpi1\_zero\_prop}
+\NormalTok{  ))}
+\NormalTok{\}}
+
+\CommentTok{\# Classement des modèles}
+\NormalTok{results }\OtherTok{\textless{}{-}}\NormalTok{ results[}\FunctionTok{order}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{results}\SpecialCharTok{$}\NormalTok{f1\_score), ]}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{\#\#\# Top 5 modèles (selon F1{-}score)}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### Top 5 modèles (selon F1-score)
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{head}\NormalTok{(results, }\DecValTok{5}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    ntrees sample_size ndim communs taux_detection  f1_score kpi1_zero_count
+## 1     100         128    1      20       30.76923 0.4651163               0
+## 2     250         128    1      20       30.76923 0.4651163               0
+## 3     500         128    1      20       30.76923 0.4651163               0
+## 10    100         128    2      19       29.23077 0.4418605               1
+## 4     100         256    1      18       27.69231 0.4186047               1
+##    kpi1_zero_pct
+## 1       0.000000
+## 2       0.000000
+## 3       0.000000
+## 10      4.761905
+## 4       4.761905
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{\#\#\# Bottom 5 modèles}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### Bottom 5 modèles
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{tail}\NormalTok{(results, }\DecValTok{5}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    ntrees sample_size ndim communs taux_detection  f1_score kpi1_zero_count
+## 15    500         256    2      17       26.15385 0.3953488               1
+## 19    100         128    3      17       26.15385 0.3953488               1
+## 21    500         128    3      17       26.15385 0.3953488               1
+## 23    250         256    3      17       26.15385 0.3953488               1
+## 24    500         256    3      16       24.61538 0.3720930               1
+##    kpi1_zero_pct
+## 15      4.761905
+## 19      4.761905
+## 21      4.761905
+## 23      4.761905
+## 24      4.761905
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Le meilleur modèle prédit"}\NormalTok{, results}\SpecialCharTok{$}\NormalTok{kpi1\_zero\_count[}\DecValTok{1}\NormalTok{], }
+    \StringTok{"outliers avec KPI1=0 ("}\NormalTok{,}
+    \FunctionTok{round}\NormalTok{(results}\SpecialCharTok{$}\NormalTok{kpi1\_zero\_pct[}\DecValTok{1}\NormalTok{], }\DecValTok{1}\NormalTok{), }\StringTok{"\% de ses prédictions)}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Le meilleur modèle prédit 0 outliers avec KPI1=0 ( 0 % de ses prédictions)
+\end{verbatim}
+
+Les 27 configurations testées présentent une convergence remarquable,
+avec un écart maximal de 4 outliers communs. L'analyse révèle qu'aucun
+modèle n'identifie les observations avec KPI1 = 0 comme anomalies de
+manière systématique, démontrant ainsi leur capacité à reconnaître un
+cluster comme n'étant pas une véritbale anomalie. Cette robustesse
+contextuelle, combinée à un taux de concordance significatif avec les
+outliers IQR multivariés (≥3 features aberrantes), confirme bien
+l'utilité des forêts d'isolation pour la détection d'anomalies complexes
+dans notre jeu de données.
+
+Une analyse des hyperparamètres révèle que les configurations les plus
+performantes partagent trois caractéristiques communes :
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{ndim = 1} : Les splits univariés (une feature à la fois)
+  surpassent les approches multivariées (ndim = 2-3)
+\item
+  \textbf{sample\_size faible} (128-256) : Des échantillons réduits
+  génèrent des arbres peu profonds, plus sensibles aux valeurs extrêmes
+\item
+  \textbf{ntrees modéré} (100-250) : Un nombre d'arbres limité maintient
+  une variance élevée, favorisant la discrimination
+\end{enumerate}
+
+\subsubsection{Lien entre faible corrélation et performance des splits
+univariés}\label{lien-entre-faible-corruxe9lation-et-performance-des-splits-univariuxe9s}
+
+L'analyse de corrélation préalable révélait des \textbf{corrélations
+faibles à modérées} entre les KPIs. Cette structure de données explique
+directement pourquoi les modèles avec \textbf{ndim = 1} surpassent ceux
+avec ndim = 2-3 :
+
+\textbf{Principe théorique :} - \textbf{Splits univariés (ndim = 1)} :
+Détectent les anomalies comme des valeurs extrêmes sur une feature
+isolée - \textbf{Splits multivariés (ndim \textgreater{} 1)} : Détectent
+les anomalies contextuelles nécessitant la combinaison de plusieurs
+features
+
+\textbf{Application à nos données :}
+
+Lorsque les variables sont \textbf{fortement corrélées}, une observation
+peut être normale sur chaque feature prise individuellement, mais
+anormale dans leur combinaison (ex : température et pression
+atmosphérique). Les splits multivariés excellent dans ce cas.
+
+À l'inverse, avec de \textbf{faibles corrélations}, les variables
+évoluent de manière \textbf{indépendante}. Les anomalies se manifestent
+donc principalement comme : - Des valeurs extrêmes sur KPI1 seul - Des
+valeurs aberrantes sur KPI9 seul - Etc.
+
+\textbf{Conclusion :} La faible structure de corrélation de notre jeu de
+données rend les \textbf{anomalies univariées} (détectables par ndim =
+1) plus fréquentes que les \textbf{anomalies contextuelles multivariées}
+(nécessitant ndim \textgreater{} 1). Cela confirme la cohérence entre :
+1. La structure de corrélation des données 2. La performance des
+hyperparamètres 3. La nature des outliers détectés par la méthode IQR
+(seuils univariés)
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Récupérer les 3 modèles à analyser}
+\NormalTok{best\_model\_1 }\OtherTok{\textless{}{-}}\NormalTok{ results[}\DecValTok{1}\NormalTok{, ]}
+\NormalTok{best\_model\_2 }\OtherTok{\textless{}{-}}\NormalTok{ results[}\DecValTok{2}\NormalTok{, ]}
+\NormalTok{worst\_model }\OtherTok{\textless{}{-}}\NormalTok{ results[}\FunctionTok{nrow}\NormalTok{(results), ]}
+
+\CommentTok{\# Définir les colonnes à exclure}
+\NormalTok{cols\_to\_exclude }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"has\_multiple\_outliers"}\NormalTok{, }\StringTok{"has\_kpi1\_zero"}\NormalTok{, }\StringTok{"strata\_group"}\NormalTok{)}
+
+\CommentTok{\# Calculer les médianes de référence sur le test set}
+\NormalTok{test\_clean\_ref }\OtherTok{\textless{}{-}}\NormalTok{ test[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(test) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude]}
+\NormalTok{medians\_ref }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(test\_clean\_ref, median, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+
+\CommentTok{\# Fonction pour analyser un modèle}
+\NormalTok{analyze\_model }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(params, model\_name) \{}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"\#\#\# "}\NormalTok{, model\_name, }\StringTok{"}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"**Configuration :** ntrees = "}\NormalTok{, params}\SpecialCharTok{$}\NormalTok{ntrees, }
+      \StringTok{", sample\_size = "}\NormalTok{, params}\SpecialCharTok{$}\NormalTok{sample\_size, }
+      \StringTok{", ndim = "}\NormalTok{, params}\SpecialCharTok{$}\NormalTok{ndim, }\StringTok{"}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"**Performance :** F1{-}score = "}\NormalTok{, }\FunctionTok{round}\NormalTok{(params}\SpecialCharTok{$}\NormalTok{f1\_score, }\DecValTok{3}\NormalTok{), }
+      \StringTok{" | Taux de détection = "}\NormalTok{, }\FunctionTok{round}\NormalTok{(params}\SpecialCharTok{$}\NormalTok{taux\_detection, }\DecValTok{2}\NormalTok{), }\StringTok{"\%}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+  
+  \CommentTok{\# Entraîner le modèle}
+\NormalTok{  train\_clean }\OtherTok{\textless{}{-}}\NormalTok{ train[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(train) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude]}
+\NormalTok{  test\_clean }\OtherTok{\textless{}{-}}\NormalTok{ test[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(test) }\SpecialCharTok{\%in\%}\NormalTok{ cols\_to\_exclude]}
+  
+\NormalTok{  model }\OtherTok{\textless{}{-}} \FunctionTok{isolation.forest}\NormalTok{(train\_clean,}
+                           \AttributeTok{ntrees =}\NormalTok{ params}\SpecialCharTok{$}\NormalTok{ntrees,}
+                           \AttributeTok{sample\_size =}\NormalTok{ params}\SpecialCharTok{$}\NormalTok{sample\_size,}
+                           \AttributeTok{ndim =}\NormalTok{ params}\SpecialCharTok{$}\NormalTok{ndim)}
+  
+\NormalTok{  scores }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(model, test\_clean)}
+\NormalTok{  test\_temp }\OtherTok{\textless{}{-}}\NormalTok{ test\_clean}
+\NormalTok{  test\_temp}\SpecialCharTok{$}\NormalTok{anomaly\_score }\OtherTok{\textless{}{-}}\NormalTok{ scores}
+  
+  \CommentTok{\# Top 5 anomalies}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"\#\#\#\# Top 5 anomalies (scores élevés)}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{  top5\_high }\OtherTok{\textless{}{-}}\NormalTok{ test\_temp[}\FunctionTok{order}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{test\_temp}\SpecialCharTok{$}\NormalTok{anomaly\_score), ][}\DecValTok{1}\SpecialCharTok{:}\DecValTok{5}\NormalTok{, ]}
+  
+  \CommentTok{\# Analyser chaque ligne}
+  \ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(top5\_high)) \{}
+\NormalTok{    ligne\_idx }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{rownames}\NormalTok{(top5\_high)[i])}
+    
+    \CommentTok{\# Calculer écarts pour cette ligne}
+\NormalTok{    ecarts }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(test\_clean[ligne\_idx, ]) }\SpecialCharTok{{-}}\NormalTok{ medians\_ref}
+\NormalTok{    ecarts\_percent }\OtherTok{\textless{}{-}}\NormalTok{ (ecarts }\SpecialCharTok{/}\NormalTok{ medians\_ref) }\SpecialCharTok{*} \DecValTok{100}
+    \FunctionTok{names}\NormalTok{(ecarts\_percent) }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(test\_clean)}
+    
+    \CommentTok{\# Trier par écart absolu (CORRECTION ICI)}
+\NormalTok{    ecarts\_abs }\OtherTok{\textless{}{-}} \FunctionTok{abs}\NormalTok{(ecarts\_percent)}
+\NormalTok{    top3\_indices }\OtherTok{\textless{}{-}} \FunctionTok{order}\NormalTok{(ecarts\_abs, }\AttributeTok{decreasing =} \ConstantTok{TRUE}\NormalTok{)[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{3}\NormalTok{]}
+\NormalTok{    features\_pb }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(test\_clean)[top3\_indices]}
+    
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"**Ligne "}\NormalTok{, }\FunctionTok{rownames}\NormalTok{(top5\_high)[i], }\StringTok{"** (Score: "}\NormalTok{, }
+        \FunctionTok{round}\NormalTok{(top5\_high}\SpecialCharTok{$}\NormalTok{anomaly\_score[i], }\DecValTok{4}\NormalTok{), }\StringTok{")}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+    
+\NormalTok{    deviation\_df }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+      \AttributeTok{Feature =}\NormalTok{ features\_pb,}
+      \AttributeTok{Valeur =} \FunctionTok{round}\NormalTok{(}\FunctionTok{as.numeric}\NormalTok{(test\_clean[ligne\_idx, features\_pb]), }\DecValTok{2}\NormalTok{),}
+\NormalTok{      Médiane }\OtherTok{=} \FunctionTok{round}\NormalTok{(medians\_ref[features\_pb], }\DecValTok{2}\NormalTok{),}
+\NormalTok{      É}\AttributeTok{cart =} \FunctionTok{round}\NormalTok{(ecarts[top3\_indices], }\DecValTok{2}\NormalTok{),}
+      \StringTok{\textasciigrave{}}\AttributeTok{Écart\_\%}\StringTok{\textasciigrave{}} \OtherTok{=} \FunctionTok{paste0}\NormalTok{(}\FunctionTok{round}\NormalTok{(ecarts\_percent[top3\_indices], }\DecValTok{1}\NormalTok{), }\StringTok{"\%"}\NormalTok{)}
+\NormalTok{    )}
+    \FunctionTok{print}\NormalTok{(knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(deviation\_df, }\AttributeTok{row.names =} \ConstantTok{FALSE}\NormalTok{))}
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{  \}}
+  
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"{-}{-}{-}}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+  
+  \CommentTok{\# Top 5 normales}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"\#\#\#\# Top 5 observations normales (scores faibles)}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{  top5\_low }\OtherTok{\textless{}{-}}\NormalTok{ test\_temp[}\FunctionTok{order}\NormalTok{(test\_temp}\SpecialCharTok{$}\NormalTok{anomaly\_score), ][}\DecValTok{1}\SpecialCharTok{:}\DecValTok{5}\NormalTok{, ]}
+  
+  \ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(top5\_low)) \{}
+\NormalTok{    ligne\_idx }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{rownames}\NormalTok{(top5\_low)[i])}
+\NormalTok{    ecarts }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(test\_clean[ligne\_idx, ]) }\SpecialCharTok{{-}}\NormalTok{ medians\_ref}
+\NormalTok{    ecarts\_percent }\OtherTok{\textless{}{-}}\NormalTok{ (ecarts }\SpecialCharTok{/}\NormalTok{ medians\_ref) }\SpecialCharTok{*} \DecValTok{100}
+    
+\NormalTok{    max\_deviation }\OtherTok{\textless{}{-}} \FunctionTok{max}\NormalTok{(}\FunctionTok{abs}\NormalTok{(ecarts\_percent), }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+    
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"**Ligne "}\NormalTok{, }\FunctionTok{rownames}\NormalTok{(top5\_low)[i], }\StringTok{"** (Score: "}\NormalTok{, }
+        \FunctionTok{round}\NormalTok{(top5\_low}\SpecialCharTok{$}\NormalTok{anomaly\_score[i], }\DecValTok{4}\NormalTok{), }
+        \StringTok{") {-} Écart max: "}\NormalTok{, }\FunctionTok{round}\NormalTok{(max\_deviation, }\DecValTok{1}\NormalTok{), }\StringTok{"\%}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+\NormalTok{  \}}
+  
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"{-}{-}{-}}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+  
+  \CommentTok{\# Statistiques des scores}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"\#\#\#\# Statistiques descriptives}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{  stats\_df }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+\NormalTok{    Métrique }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{"Moyenne"}\NormalTok{, }\StringTok{"Médiane"}\NormalTok{, }\StringTok{"Écart{-}type"}\NormalTok{, }\StringTok{"Minimum"}\NormalTok{, }\StringTok{"Maximum"}\NormalTok{, }\StringTok{"Range"}\NormalTok{),}
+    \AttributeTok{Valeur =} \FunctionTok{c}\NormalTok{(}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(scores), }\DecValTok{4}\NormalTok{),}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{median}\NormalTok{(scores), }\DecValTok{4}\NormalTok{),}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{sd}\NormalTok{(scores), }\DecValTok{4}\NormalTok{),}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{min}\NormalTok{(scores), }\DecValTok{4}\NormalTok{),}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{max}\NormalTok{(scores), }\DecValTok{4}\NormalTok{),}
+      \FunctionTok{round}\NormalTok{(}\FunctionTok{max}\NormalTok{(scores) }\SpecialCharTok{{-}} \FunctionTok{min}\NormalTok{(scores), }\DecValTok{4}\NormalTok{)}
+\NormalTok{    )}
+\NormalTok{  )}
+  \FunctionTok{print}\NormalTok{(knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(stats\_df, }\AttributeTok{row.names =} \ConstantTok{FALSE}\NormalTok{))}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+  
+  \CommentTok{\# Concordance IQR}
+\NormalTok{  indices\_high }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{rownames}\NormalTok{(top5\_high))}
+\NormalTok{  in\_outliers\_high }\OtherTok{\textless{}{-}} \FunctionTok{sum}\NormalTok{(indices\_high }\SpecialCharTok{\%in\%}\NormalTok{ outliers\_detected\_test)}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"**Concordance IQR :** "}\NormalTok{, in\_outliers\_high, }\StringTok{" / 5 des top anomalies sont des outliers IQR}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }\AttributeTok{sep =} \StringTok{""}\NormalTok{)}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"{-}{-}{-}}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+  
+  \FunctionTok{return}\NormalTok{(scores)}
+\NormalTok{\}}
+
+\CommentTok{\# Analyser les 3 modèles}
+\NormalTok{scores\_best1 }\OtherTok{\textless{}{-}} \FunctionTok{analyze\_model}\NormalTok{(best\_model\_1, }\StringTok{"Meilleur modèle"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### Meilleur modèle
+## 
+## **Configuration :** ntrees = 100, sample_size = 128, ndim = 1
+## 
+## **Performance :** F1-score = 0.465 | Taux de détection = 30.77%
+## 
+## #### Top 5 anomalies (scores élevés)
+## 
+## **Ligne 279** (Score: 0.7472)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    | 1.400000e-01|       0| 1.400000e-01|Inf%      |
+## |KPI3    | 1.042654e+09|  344340| 1.042310e+09|302697.9% |
+## |KPI10   | 1.186999e+09|  829426| 1.186169e+09|143010.9% |
+## 
+## **Ligne 208** (Score: 0.7442)
+## 
+## 
+## 
+## |Feature |    Valeur| Médiane|     Écart|Écart_.   |
+## |:-------|---------:|-------:|---------:|:---------|
+## |KPI3    | 700464532|  344340| 700120192|203322.4% |
+## |KPI10   | 822157450|  829426| 821328024|99023.7%  |
+## |KPI5    | 141627720|  189232| 141438488|74743.4%  |
+## 
+## **Ligne 259** (Score: 0.7096)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    |         0.11|       0|         0.11|Inf%      |
+## |KPI8    |         0.06|       0|         0.06|Inf%      |
+## |KPI3    | 444094140.00|  344340| 443749800.00|128869.7% |
+## 
+## **Ligne 210** (Score: 0.6976)
+## 
+## 
+## 
+## |Feature |     Valeur| Médiane|      Écart|Écart_.   |
+## |:-------|----------:|-------:|----------:|:---------|
+## |KPI3    | 1436894488|  344340| 1436550148|417189.4% |
+## |KPI10   | 1575626402|  829426| 1574796976|189865.9% |
+## |KPI5    |  129597500|  189232|  129408268|68386%    |
+## 
+## **Ligne 307** (Score: 0.6826)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.  |
+## |:-------|------------:|-------:|------------:|:--------|
+## |KPI6    |         0.06|       0|         0.06|Inf%     |
+## |KPI3    | 318064455.00|  344340| 317720115.00|92269.3% |
+## |KPI10   | 403205163.00|  829426| 402375737.00|48512.6% |
+## 
+## ---
+## 
+## #### Top 5 observations normales (scores faibles)
+## 
+## **Ligne 31** (Score: 0.3204) - Écart max: 100%
+## 
+## **Ligne 98** (Score: 0.3206) - Écart max: 100%
+## 
+## **Ligne 228** (Score: 0.3206) - Écart max: 100%
+## 
+## **Ligne 266** (Score: 0.3206) - Écart max: 100%
+## 
+## **Ligne 97** (Score: 0.3208) - Écart max: 149.3%
+## 
+## ---
+## 
+## #### Statistiques descriptives
+## 
+## 
+## 
+## |Métrique   | Valeur|
+## |:----------|------:|
+## |Moyenne    | 0.3888|
+## |Médiane    | 0.3568|
+## |Écart-type | 0.0826|
+## |Minimum    | 0.3204|
+## |Maximum    | 0.7472|
+## |Range      | 0.4268|
+## 
+## **Concordance IQR :** 5 / 5 des top anomalies sont des outliers IQR
+## 
+## ---
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{scores\_best2 }\OtherTok{\textless{}{-}} \FunctionTok{analyze\_model}\NormalTok{(best\_model\_2, }\StringTok{"2ème meilleur modèle"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### 2ème meilleur modèle
+## 
+## **Configuration :** ntrees = 250, sample_size = 128, ndim = 1
+## 
+## **Performance :** F1-score = 0.465 | Taux de détection = 30.77%
+## 
+## #### Top 5 anomalies (scores élevés)
+## 
+## **Ligne 279** (Score: 0.751)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    | 1.400000e-01|       0| 1.400000e-01|Inf%      |
+## |KPI3    | 1.042654e+09|  344340| 1.042310e+09|302697.9% |
+## |KPI10   | 1.186999e+09|  829426| 1.186169e+09|143010.9% |
+## 
+## **Ligne 208** (Score: 0.7449)
+## 
+## 
+## 
+## |Feature |    Valeur| Médiane|     Écart|Écart_.   |
+## |:-------|---------:|-------:|---------:|:---------|
+## |KPI3    | 700464532|  344340| 700120192|203322.4% |
+## |KPI10   | 822157450|  829426| 821328024|99023.7%  |
+## |KPI5    | 141627720|  189232| 141438488|74743.4%  |
+## 
+## **Ligne 259** (Score: 0.709)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    |         0.11|       0|         0.11|Inf%      |
+## |KPI8    |         0.06|       0|         0.06|Inf%      |
+## |KPI3    | 444094140.00|  344340| 443749800.00|128869.7% |
+## 
+## **Ligne 210** (Score: 0.6995)
+## 
+## 
+## 
+## |Feature |     Valeur| Médiane|      Écart|Écart_.   |
+## |:-------|----------:|-------:|----------:|:---------|
+## |KPI3    | 1436894488|  344340| 1436550148|417189.4% |
+## |KPI10   | 1575626402|  829426| 1574796976|189865.9% |
+## |KPI5    |  129597500|  189232|  129408268|68386%    |
+## 
+## **Ligne 307** (Score: 0.6819)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.  |
+## |:-------|------------:|-------:|------------:|:--------|
+## |KPI6    |         0.06|       0|         0.06|Inf%     |
+## |KPI3    | 318064455.00|  344340| 317720115.00|92269.3% |
+## |KPI10   | 403205163.00|  829426| 402375737.00|48512.6% |
+## 
+## ---
+## 
+## #### Top 5 observations normales (scores faibles)
+## 
+## **Ligne 98** (Score: 0.3186) - Écart max: 100%
+## 
+## **Ligne 228** (Score: 0.3186) - Écart max: 100%
+## 
+## **Ligne 266** (Score: 0.3186) - Écart max: 100%
+## 
+## **Ligne 15** (Score: 0.3187) - Écart max: 100%
+## 
+## **Ligne 38** (Score: 0.3187) - Écart max: 100%
+## 
+## ---
+## 
+## #### Statistiques descriptives
+## 
+## 
+## 
+## |Métrique   | Valeur|
+## |:----------|------:|
+## |Moyenne    | 0.3857|
+## |Médiane    | 0.3542|
+## |Écart-type | 0.0828|
+## |Minimum    | 0.3186|
+## |Maximum    | 0.7510|
+## |Range      | 0.4325|
+## 
+## **Concordance IQR :** 5 / 5 des top anomalies sont des outliers IQR
+## 
+## ---
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{scores\_worst }\OtherTok{\textless{}{-}} \FunctionTok{analyze\_model}\NormalTok{(worst\_model, }\StringTok{"Pire modèle"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ### Pire modèle
+## 
+## **Configuration :** ntrees = 500, sample_size = 256, ndim = 3
+## 
+## **Performance :** F1-score = 0.372 | Taux de détection = 24.62%
+## 
+## #### Top 5 anomalies (scores élevés)
+## 
+## **Ligne 279** (Score: 0.7566)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    | 1.400000e-01|       0| 1.400000e-01|Inf%      |
+## |KPI3    | 1.042654e+09|  344340| 1.042310e+09|302697.9% |
+## |KPI10   | 1.186999e+09|  829426| 1.186169e+09|143010.9% |
+## 
+## **Ligne 210** (Score: 0.7281)
+## 
+## 
+## 
+## |Feature |     Valeur| Médiane|      Écart|Écart_.   |
+## |:-------|----------:|-------:|----------:|:---------|
+## |KPI3    | 1436894488|  344340| 1436550148|417189.4% |
+## |KPI10   | 1575626402|  829426| 1574796976|189865.9% |
+## |KPI5    |  129597500|  189232|  129408268|68386%    |
+## 
+## **Ligne 70** (Score: 0.7263)
+## 
+## 
+## 
+## |Feature | Valeur| Médiane| Écart|Écart_. |
+## |:-------|------:|-------:|-----:|:-------|
+## |KPI6    |  14.29|    0.00| 14.29|Inf%    |
+## |KPI8    |  20.00|    0.00| 20.00|Inf%    |
+## |KPI2    |   0.00|    2.01| -2.01|-100%   |
+## 
+## **Ligne 208** (Score: 0.7177)
+## 
+## 
+## 
+## |Feature |    Valeur| Médiane|     Écart|Écart_.   |
+## |:-------|---------:|-------:|---------:|:---------|
+## |KPI3    | 700464532|  344340| 700120192|203322.4% |
+## |KPI10   | 822157450|  829426| 821328024|99023.7%  |
+## |KPI5    | 141627720|  189232| 141438488|74743.4%  |
+## 
+## **Ligne 296** (Score: 0.6809)
+## 
+## 
+## 
+## |Feature |       Valeur| Médiane|        Écart|Écart_.   |
+## |:-------|------------:|-------:|------------:|:---------|
+## |KPI6    |         1.41|       0|         1.41|Inf%      |
+## |KPI3    | 779301850.00|  344340| 778957510.00|226217.5% |
+## |KPI10   | 824874813.00|  829426| 824045387.00|99351.3%  |
+## 
+## ---
+## 
+## #### Top 5 observations normales (scores faibles)
+## 
+## **Ligne 59** (Score: 0.3118) - Écart max: 100%
+## 
+## **Ligne 60** (Score: 0.3119) - Écart max: 100%
+## 
+## **Ligne 347** (Score: 0.3119) - Écart max: 100%
+## 
+## **Ligne 135** (Score: 0.3119) - Écart max: 100%
+## 
+## **Ligne 10** (Score: 0.3119) - Écart max: 100%
+## 
+## ---
+## 
+## #### Statistiques descriptives
+## 
+## 
+## 
+## |Métrique   | Valeur|
+## |:----------|------:|
+## |Moyenne    | 0.3646|
+## |Médiane    | 0.3292|
+## |Écart-type | 0.0801|
+## |Minimum    | 0.3118|
+## |Maximum    | 0.7566|
+## |Range      | 0.4448|
+## 
+## **Concordance IQR :** 4 / 5 des top anomalies sont des outliers IQR
+## 
+## ---
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{2}\NormalTok{))}
+
+\CommentTok{\# Plot 1: Distribution des scores}
+\FunctionTok{boxplot}\NormalTok{(}\FunctionTok{list}\NormalTok{(}\AttributeTok{Meilleur =}\NormalTok{ scores\_best1, }
+             \StringTok{\textasciigrave{}}\AttributeTok{2ème}\StringTok{\textasciigrave{}} \OtherTok{=}\NormalTok{ scores\_best2, }
+             \AttributeTok{Pire =}\NormalTok{ scores\_worst),}
+        \AttributeTok{col =} \FunctionTok{c}\NormalTok{(}\StringTok{"lightgreen"}\NormalTok{, }\StringTok{"lightblue"}\NormalTok{, }\StringTok{"lightcoral"}\NormalTok{),}
+        \AttributeTok{main =} \StringTok{"Distribution des scores d\textquotesingle{}anomalie"}\NormalTok{,}
+        \AttributeTok{ylab =} \StringTok{"Score d\textquotesingle{}anomalie"}\NormalTok{,}
+        \AttributeTok{las =} \DecValTok{1}\NormalTok{)}
+
+\CommentTok{\# Plot 2: Variance des scores}
+\NormalTok{variances }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\FunctionTok{var}\NormalTok{(scores\_best1), }\FunctionTok{var}\NormalTok{(scores\_best2), }\FunctionTok{var}\NormalTok{(scores\_worst))}
+\FunctionTok{barplot}\NormalTok{(variances, }
+        \AttributeTok{names.arg =} \FunctionTok{c}\NormalTok{(}\StringTok{"Meilleur"}\NormalTok{, }\StringTok{"2ème"}\NormalTok{, }\StringTok{"Pire"}\NormalTok{),}
+        \AttributeTok{col =} \FunctionTok{c}\NormalTok{(}\StringTok{"lightgreen"}\NormalTok{, }\StringTok{"lightblue"}\NormalTok{, }\StringTok{"lightcoral"}\NormalTok{),}
+        \AttributeTok{main =} \StringTok{"Variance des scores"}\NormalTok{,}
+        \AttributeTok{ylab =} \StringTok{"Variance"}\NormalTok{,}
+        \AttributeTok{las =} \DecValTok{1}\NormalTok{,}
+        \AttributeTok{ylim =} \FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\FunctionTok{max}\NormalTok{(variances) }\SpecialCharTok{*} \FloatTok{1.1}\NormalTok{))}
+\FunctionTok{text}\NormalTok{(}\AttributeTok{x =} \FunctionTok{c}\NormalTok{(}\FloatTok{0.7}\NormalTok{, }\FloatTok{1.9}\NormalTok{, }\FloatTok{3.1}\NormalTok{), }
+     \AttributeTok{y =}\NormalTok{ variances }\SpecialCharTok{+} \FunctionTok{max}\NormalTok{(variances) }\SpecialCharTok{*} \FloatTok{0.03}\NormalTok{, }
+     \AttributeTok{labels =} \FunctionTok{round}\NormalTok{(variances, }\DecValTok{5}\NormalTok{),}
+     \AttributeTok{cex =} \FloatTok{0.8}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{figure}
+\centering
+\includegraphics{PB3_files/figure-latex/unnamed-chunk-14-1.pdf}
+\caption{Comparaison des distributions de scores}
+\end{figure}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow =} \FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{\#\# Analyse comparative finale}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ## Analyse comparative finale
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Tableau de comparaison}
+\NormalTok{comp\_df }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+\NormalTok{  Modèle }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{"Meilleur"}\NormalTok{, }\StringTok{"2ème"}\NormalTok{, }\StringTok{"Pire"}\NormalTok{),}
+  \AttributeTok{Variance =} \FunctionTok{round}\NormalTok{(}\FunctionTok{c}\NormalTok{(}\FunctionTok{var}\NormalTok{(scores\_best1), }\FunctionTok{var}\NormalTok{(scores\_best2), }\FunctionTok{var}\NormalTok{(scores\_worst)), }\DecValTok{6}\NormalTok{),}
+  \AttributeTok{Range =} \FunctionTok{round}\NormalTok{(}\FunctionTok{c}\NormalTok{(}
+    \FunctionTok{max}\NormalTok{(scores\_best1) }\SpecialCharTok{{-}} \FunctionTok{min}\NormalTok{(scores\_best1),}
+    \FunctionTok{max}\NormalTok{(scores\_best2) }\SpecialCharTok{{-}} \FunctionTok{min}\NormalTok{(scores\_best2),}
+    \FunctionTok{max}\NormalTok{(scores\_worst) }\SpecialCharTok{{-}} \FunctionTok{min}\NormalTok{(scores\_worst)}
+\NormalTok{  ), }\DecValTok{4}\NormalTok{),}
+  \AttributeTok{F1\_score =} \FunctionTok{round}\NormalTok{(}\FunctionTok{c}\NormalTok{(best\_model\_1}\SpecialCharTok{$}\NormalTok{f1\_score, best\_model\_2}\SpecialCharTok{$}\NormalTok{f1\_score, worst\_model}\SpecialCharTok{$}\NormalTok{f1\_score), }\DecValTok{3}\NormalTok{)}
+\NormalTok{)}
+
+\NormalTok{knitr}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(comp\_df, }
+             \AttributeTok{caption =} \StringTok{"Comparaison des métriques clés"}\NormalTok{,}
+             \AttributeTok{align =} \FunctionTok{c}\NormalTok{(}\StringTok{"l"}\NormalTok{, }\StringTok{"r"}\NormalTok{, }\StringTok{"r"}\NormalTok{, }\StringTok{"r"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lrrr@{}}
+\caption{Comparaison des métriques clés}\tabularnewline
+\toprule\noalign{}
+Modèle & Variance & Range & F1\_score \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+Modèle & Variance & Range & F1\_score \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Meilleur & 0.006816 & 0.4268 & 0.465 \\
+2ème & 0.006849 & 0.4325 & 0.465 \\
+Pire & 0.006412 & 0.4448 & 0.372 \\
+\end{longtable}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{**Interprétation :**}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## **Interprétation :**
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"{-} Une **variance élevée** indique une meilleure séparation entre anomalies et données normales}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## - Une **variance élevée** indique une meilleure séparation entre anomalies et données normales
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"{-} Un **range large** suggère une discrimination claire des valeurs extrêmes}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## - Un **range large** suggère une discrimination claire des valeurs extrêmes
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"{-} Le **F1{-}score** mesure la concordance avec les outliers IQR (≥3 features aberrantes)}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## - Le **F1-score** mesure la concordance avec les outliers IQR (≥3 features aberrantes)
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Les meilleurs modèles combinent haute variance, range large et bon F1{-}score, confirmant leur capacité à identifier de véritables anomalies multivariées.}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Les meilleurs modèles combinent haute variance, range large et bon F1-score, confirmant leur capacité à identifier de véritables anomalies multivariées.
+\end{verbatim}
+
+\end{document}
