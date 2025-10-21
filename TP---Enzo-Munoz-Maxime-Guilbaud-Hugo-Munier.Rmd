@@ -1,0 +1,504 @@
+---
+title: "TP - Abres de décision et forêts aléatoires"
+author: "Enzo Munoz - Hugo Munier - Maxime Guilbaud"
+date: "2025-10-21"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(
+  fig.width = 7,        
+  fig.height = 4.5,
+  out.width = "90%",    
+  fig.align = "center", 
+  fig.pos = "H"       
+)
+knitr::opts_chunk$set(
+  message = FALSE,   
+  warning = FALSE    
+)
+```
+
+```{r}
+# Bibliothèques utilisées
+
+library(GGally)
+library(ggplot2)
+library(ggcorrplot)
+library(corrplot)
+library(tidyverse)
+library(data.table)
+library(janitor)
+library(skimr)
+library(caret)
+library(pROC)
+library(randomForest)
+library(ranger)
+library(rpart)
+library(rpart.plot)
+```
+## Importation des données
+```{r}
+# Importation des données
+
+data <- read.csv("C:/Users/hugom/OneDrive - Aescra Emlyon Business School/Mines de Saint-Etienne/3A/Science des données/Arbres de décision et forêts aléatoires/TP/7 bank_marketing.csv", 
+                 sep=";", header=TRUE)
+head(data)
+summary(data)
+```
+Le jeu de données étudié comprend 8 variables de type catégoriel (caractère) et 2 variables numériques (float). L’objectif de notre travail est de développer un modèle prédictif pour la variable class, qui indique si un client souscrit ou non à un dépôt à terme.
+
+## Valeurs manquantes
+```{r}
+# valeurs manquantes
+print("=== Nombre de NA par variable ===")
+colSums(is.na(data))
+print("=== Nombre de 'unknown' par variable ===")
+sapply(data, function(x) sum(x == "unknown", na.rm=TRUE))
+```
+Le jeu de données ne présente aucune valeur manquante, ce qui nous dispense d’effectuer des étapes de traitement ou d’imputation liées aux données manquantes.
+
+## Transformation des variables
+```{r}
+# Transformation en facteur
+factor_vars <- c("marital", "education", "contact", "poutcome", "default", "housing", "loan", "class")
+data[factor_vars] <- lapply(data[factor_vars], as.factor)
+
+# Transformation en numérique
+numeric_vars <- c("balance", "age")
+data[numeric_vars] <- lapply(data[numeric_vars], as.numeric)
+
+# Vérification
+str(data)
+summary(data)
+```
+Afin de pouvoir exploiter correctement l’ensemble des variables dans R, les variables catégorielles ont été converties en facteurs, tandis que les variables quantitatives ont été transformées en numériques.
+
+## Analyse univariée
+```{r}
+# Analyse univariée
+hist(data$age,
+     main = "Distribution de l'âge",
+     xlab = "Âge",
+     col = "skyblue",
+     border = "white",
+     breaks = 20)
+
+hist(data$balance,
+     main = "Distribution du solde (balance)",
+     xlab = "Balance (€)",
+     col = "orange",
+     border = "white",
+     breaks = 50,
+     xlim = c(-5000, 10000))
+
+boxplot(data$age,
+        main = "Boxplot de l'âge",
+        col = "skyblue",
+        horizontal = TRUE)
+
+boxplot(data$balance,
+        main = "Boxplot du solde (balance)",
+        col = "orange",
+        horizontal = TRUE)
+
+
+for (var in factor_vars) {
+  print(
+    ggplot(data, aes_string(x = var, fill = var)) +
+      geom_bar() +
+      labs(title = paste("Répartition de", var),
+           x = var,
+           y = "Effectifs") +
+      theme_minimal() +
+      theme(legend.position = "none")
+  )
+}
+```
+L’analyse univariée met en évidence un fort déséquilibre dans les données : la majorité des clients n’ont pas souscrit à un dépôt à terme (class = no), et la variable poutcome est dominée par la modalité failure. Du côté des variables numériques, l’âge est principalement concentré entre 30 et 40 ans, tandis que le solde des comptes présente une distribution asymétrique, avec la majorité des valeurs proches de zéro mais quelques soldes très élevés. Ces constats soulignent à la fois un déséquilibre de classes et la présence de valeurs extrêmes. Les valeurs extrêmes ne posent pas de problèmes car les arbres de décision et les forêts aléatoires n'y sont pas sensibles. En revanche, ce déséquilibre issu de la variable class est à prendre en compte pour la modélisation.
+
+Cette première analyse univariée permet dès le départ de visualiser la distribution des variables et d’en obtenir une première compréhension.
+
+## Analyse bivariée
+```{r}
+# Analyse bivariée
+
+ggplot(data, aes(x = class, y = age, fill = class)) +
+  geom_boxplot() +
+  labs(title = "Boxplot de l'âge par classe",
+       x = "Classe (Souscription dépôt à terme)",
+       y = "Âge") +
+  theme_minimal()
+
+ggplot(data, aes(x = age, fill = class)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Densité de l'âge selon la classe",
+       x = "Âge", y = "Densité") +
+  theme_minimal()
+
+ggplot(data, aes(x = class, y = balance, fill = class)) +
+  geom_boxplot() +
+  labs(title = "Boxplot du solde (balance) par classe",
+       x = "Classe (Souscription dépôt à terme)",
+       y = "Solde du compte (€)") +
+  theme_minimal()
+
+boxplot(balance ~ class, 
+        data = data,
+        main = "Distribution du solde par classe (zoom)",
+        xlab = "Classe (Souscription dépôt à terme)",
+        ylab = "Solde (€)",
+        col = c("orange", "skyblue"),
+        ylim = c(-2000, 10000))
+
+table(data$marital, data$class)
+prop.table(table(data$marital, data$class), margin = 1)
+
+# Barplot empilé
+
+ggplot(data, aes(x = marital, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon marital",
+       x = "Situation maritale", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+table(data$education, data$class)
+prop.table(table(data$education, data$class), margin = 1)
+
+ggplot(data, aes(x = education, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon éducation",
+       x = "Niveau d'éducation", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+for (var in c("housing", "loan", "default")) {
+  print(table(data[[var]], data$class))
+  print(prop.table(table(data[[var]], data$class), margin = 1))
+  
+  print(
+    ggplot(data, aes_string(x = var, fill = "class")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Taux de souscription selon", var),
+           x = var, y = "Proportion") +
+      scale_y_continuous(labels = scales::percent) +
+      theme_minimal()
+  )
+}
+
+table(data$contact, data$class)
+prop.table(table(data$contact, data$class), margin = 1)
+
+ggplot(data, aes(x = contact, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon type de contact",
+       x = "Type de contact", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+table(data$poutcome, data$class)
+prop.table(table(data$poutcome, data$class), margin = 1)
+
+ggplot(data, aes(x = poutcome, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Taux de souscription selon résultat campagne précédente",
+       x = "Résultat précédent", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+```
+L’analyse bivariée met en évidence plusieurs relations intéressantes avec la variable cible. Nous allons illustré notre porpos avec quelques exemples. Tout d’abord, la densité de l’âge selon la classe montre que les clients plus âgés ont tendance à souscrire davantage à un dépôt à terme, contrairement aux plus jeunes chez qui les refus sont plus fréquents. Ensuite, la variable poutcome illustre une relation claire : les clients dont la campagne précédente s’est soldée par un succès présentent un taux de souscription nettement plus élevé que ceux associés aux modalités failure ou other. Enfin, la variable housing révèle que les clients sans crédit logement sont proportionnellement plus enclins à souscrire, tandis que ceux ayant un prêt immobilier souscrivent beaucoup moins.
+
+## Analyse multidimensionnelle
+```{r}
+numeric_data <- data[, numeric_vars]
+
+cat_vars <- c("marital", "education", "default", "housing", "loan", "contact", "poutcome","class")
+dummies <- dummyVars(~ ., data = data[, cat_vars])
+cat_data <- data.frame(predict(dummies, newdata = data))
+
+data_corr <- cbind(numeric_data, cat_data)
+cor_matrix <- cor(data_corr, use = "complete.obs")
+
+plot_df <- cbind(data_corr, class = data$class)
+
+vars_to_plot <- c("age", "balance", "marital.married", "marital.divorced","marital.single", "education.tertiary", "housing.yes", "loan.yes", "poutcome.success")
+
+corrplot(cor_matrix, method = "color", type = "upper",
+         tl.cex = 0.7,
+         title = "Matrice de corrélations")
+```
+La matrice de corrélations permet d’identifier les relations linéaires entre les variables. On observe que la variable cible class.yes est positivement corrélée avec poutcome.success, confirmant que les clients ayant connu un succès lors de la campagne précédente ont davantage tendance à souscrire. À l’inverse, elle est négativement corrélée avec poutcome.failure et housing.yes, ce qui reflète les tendances mises en évidence dans l’analyse bivariée. Concernant les variables explicatives entre elles, les corrélations restent globalement faibles, ce qui limite le risque de forte multicolinéarité.
+
+En résumé, l’analyse descriptive du jeu de données révèle à la fois un déséquilibre de la variable cible, des relations significatives entre certaines caractéristiques (âge, résultat de campagne, crédit logement) et la probabilité de souscription, ainsi que des corrélations globalement faibles entre variables explicatives, ce qui constitue une base solide pour la phase de modélisation.
+
+## PARTIE I
+
+## Split Apprentissage
+```{r}
+target_col <- "class"
+levels(data[[target_col]])
+
+x_cols <- setdiff(names(data), target_col)
+
+set.seed(1234)
+idx <- createDataPartition(data[[target_col]], p = 0.8, list = FALSE)
+train <- data[idx, ]
+test  <- data[-idx, ]
+
+dim(train)
+dim(test)
+
+prop.table(table(train[[target_col]]))
+prop.table(table(test[[target_col]]))
+```
+Dans cette première partie "Split apprentissage", nous avons séparé l’échantillon en deux jeux de données : 80 % pour l’apprentissage et 20 % pour le test. Après cette séparation, on retrouve dans chaque jeu environ 77 % de "no" et 23 % de "yes". Cela montre que le jeu de test reste représentatif de l’ensemble des données et pourra donc servir à évaluer correctement la capacité de généralisation des modèles. Ce point est important, car la classe "yes" étant minoritaire, il faut s’assurer que cette proportion soit bien conservée dans le jeu de test afin d’éviter un biais et d’obtenir des indicateurs de performance fiables.
+
+## Construction de notre arbre de décisions
+```{r}
+set.seed(1234)
+arbre_dd <- rpart(class ~ ., data = train, method = "class", 
+                    control = rpart.control(cp = 0.001))
+
+rpart.plot(arbre_dd, type = 2, extra = 106)
+```
+Nous avons construit un arbre de décision en fixant un paramètre de complexité petit. Ce choix permet à l’algorithme de conserver un grand nombre de divisions. Nous obtenons ainsi à un arbre relativement profond et ramifié, comme le montre la figure ci-dessus. Ce type de modèle peut s’avérer performant sur les données d’apprentissage car il capture de nombreuses nuances, mais il présente également un risque élevé de surapprentissage. En effet, l’arbre devient trop spécifique aux données du train et généralise moins bien sur de nouvelles observations.
+
+Pour pallier ce problème, nous allons par la suite ajuster le paramètre de complexité par un processus d’élagage. La méthode consiste à tracer la courbe d’erreur en fonction de la valeur de cp et à retenir le cp optimal. Cette étape permettra de simplifier l’arbre et d’améliorer sa capacité de généralisation.
+
+## Optimisation de notre arbre de décisions
+```{r}
+printcp(arbre_dd)  
+plotcp(arbre_dd) 
+
+opt_cp <- arbre_dd$cptable[which.min(arbre_dd$cptable[,"xerror"]), "CP"]
+cat("\nParamètre cp optimal retenu :", opt_cp, "\n")
+
+opt_cp <- 0.0019
+arbre_dd_opti <- prune(arbre_dd, cp = opt_cp)
+
+rpart.plot(arbre_dd_opti, type = 2, extra = 106, under = TRUE)
+```
+La racine de l’arbre présente une erreur de classification de 22,8 %, ce qui signifie qu’environ un quart des observations sont mal classées au départ. L’analyse de la table de complexité et de la courbe d’erreur montre que l’erreur de validation croisée diminue fortement dès le premier split, puis se stabilise et repart légèrement à la hausse lorsque l’arbre devient plus complexe. Le paramètre cp optimal retenu est donc 0.00165, car il correspond au minimum de l’erreur de validation croisée. Cela permet d’élaguer l’arbre pour conserver un modèle plus simple et robuste, évitant ainsi le surapprentissage tout en maintenant une bonne capacité de généralisation.
+
+## Evaluation sur le jeu de test
+```{r}
+pred_class <- predict(arbre_dd_opti, newdata = test, type = "class")
+pred_prob <- predict(arbre_dd_opti, newdata = test, type = "prob")
+
+conf_matrix <- confusionMatrix(pred_class, test$class, positive = "yes") 
+print(conf_matrix)
+
+roc_obj <- roc(response = test$class,
+               predictor = pred_prob[, "yes"],
+               levels = rev(levels(test$class)))
+auc_value <- auc(roc_obj)
+cat("AUC =", auc_value, "\n")
+
+plot(roc_obj, col = "blue", lwd = 2, main = "Courbe ROC - Arbre optimal")
+```
+L’évaluation du modèle optimal sur les données de test montre une accuracy globale de 83 %, significativement supérieure au taux de référence (No Information Rate = 77 %). La matrice de confusion met en évidence une bonne capacité du classifieur à reconnaître les clients n’ayant pas souscrit, avec une spécificité élevée de 91,3 %. En revanche, la sensibilité reste plus limitée (55,1 %), ce qui signifie qu’un peu moins de six clients souscripteurs sur dix sont correctement identifiés. Ce déséquilibre entre précision sur les "no" et rappel sur les "yes" est courant dans des jeux de données où la classe positive est minoritaire. La valeur prédictive positive (65,1 %) et la valeur prédictive négative (87,3 %) confirment cette tendance. Les prédictions "no" sont plus fiables que les prédictions "yes". Le coefficient de Kappa (0,49) traduit un accord modéré entre les prédictions et la réalité.
+L’analyse de la courbe ROC indique une bonne capacité de discrimination globale du modèle, supérieure à un classifieur aléatoire (AUC = 0,5), mais encore perfectible pour atteindre des standards élevés supérieurs à 0.8. La courbe ROC présente une montée rapide dès les premiers seuils, ce qui traduit une aptitude du modèle à distinguer efficacement les deux classes dès les probabilités les plus faibles.
+
+En conclusion, le modèle présente une performance satisfaisante avec une bonne précision globale et une capacité discriminante correcte, mais il privilégie la détection des non-souscripteurs au détriment des souscripteurs. Selon les objectifs de l’étude, il pourrait être pertinent de diminuer le seuil de décision (actuellement fixé à 0,5) afin d’augmenter le rappel sur la classe "yes", quitte à introduire davantage de faux positifs. Cette approche permettrait de maximiser la détection des clients susceptibles de souscrire, ce qui constitue souvent l’objectif prioritaire dans un contexte marketing.
+
+## Modèle de régression logistique
+```{r}
+logit_model <- glm(class ~ ., data = train, family = binomial)
+
+summary(logit_model)
+
+logit_prob <- predict(logit_model, newdata = test, type = "response")
+
+logit_class <- ifelse(logit_prob >= 0.5, "yes", "no")
+logit_class <- factor(logit_class, levels = c("no", "yes"))
+
+confusionMatrix(logit_class, test$class, positive = "yes")
+
+roc_logit <- roc(response = test$class,
+                 predictor = logit_prob,
+                 levels = rev(levels(test$class)))
+
+auc_logit <- auc(roc_logit)
+cat("AUC régression logistique =", auc_logit, "\n")
+
+plot(roc_logit, col = "darkgreen", lwd = 2, main = "ROC - Arbre vs Logit")
+lines(roc_obj, col = "blue", lwd = 2)
+legend("bottomright", legend = c("Logit", "Arbre"),
+       col = c("darkgreen", "blue"), lwd = 2)
+```
+L’arbre optimal atteint une accuracy de 83 % et une AUC de 0,73, avec une bonne capacité à identifier les non-souscripteurs (spécificité de 91 %) mais une sensibilité plus limitée (55 %). La régression logistique présente une accuracy comparable (82,8 %) mais une AUC supérieure (0,82), traduisant une meilleure capacité globale de discrimination entre les classes. On observe toutefois que la sensibilité du modèle logistique (44,8 %) est inférieure à celle de l’arbre, alors que sa spécificité (94 %) est plus élevée. Il privilégie ainsi fortement la détection des "no" au détriment des "yes".
+
+De plus, la régression logistique présente l’avantage d’être plus interprétable d’un point de vue statistique. Les coefficients estimés permettent de quantifier l’effet de chaque variable explicative. Par exemple, un résultat positif à la campagne précédente augmente la probabilité de souscription, tandis qu’un prêt immobilier la réduit. L’arbre de décision est quant à lui plus intuitif visuellement et offre une segmentation opérationnelle claire des clients.
+
+En conclusion, la régression logistique se distingue par sa meilleure calibration probabiliste et son pouvoir discriminant global avec un AUC plus élevé, tandis que l’arbre reste un outil de décision pratique et lisible pour une segmentation marketing.
+
+## PARTIE II
+
+## Schéma de validation et métriques
+
+```{r}
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 5, repeats = 2,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  sampling = "down",
+  savePredictions = "final"
+)
+```
+Nous avons ensuite mis en place un schéma de validation pour évaluer et comparer les deux modèles de forêts aléatoires. Le jeu d’apprentissage est soumis à une validation croisée à 5 folds, répétée deux fois afin de limiter la variance des estimations. Comme la variable "class" est déséquilibrée, nous appliquons un down sampling à chaque fold afin d’éviter que le modèle n’apprenne à prédire uniquement "no". Les performances sont alors mesurées à l’aide de plusieurs indicateurs : l’AUC/ROC, la sensibilité et la spécificité. Enfin, une évaluation finale est réalisée sur le jeu de test pour estimer la capacité de généralisation de nos deux modèles.
+
+## Arbre de décision illustratif
+```{r}
+model_tree <- rpart(class ~ ., data = train, method = "class")
+rpart.plot(model_tree, type=2, extra=104, main="Arbre de décision")
+```
+Avant de passer à la modélisation avec les deux forêts aléatoires, nous avons ajouté un arbre de décision à titre de rappel. Celui-ci met en évidence que la variable "poutcome" joue un rôle central dans la prédiction : lorsque poutcome vaut "failure" ou "other", la probabilité de non-souscription atteint 86 %, tandis qu’en cas de "success", 65 % des clients souscrivent à nouveau. Cet arbre illustre bien la logique de segmentation, mais il reste limité puisqu’il ne repose que sur une règle principale et demeure instable. Pour obtenir un modèle plus robuste et généralisable, il est donc nécessaire d’utiliser une forêt aléatoire, issue de la combinaison de nombreux arbres.
+
+## Implémentation A
+```{r}
+grid_rf <- expand.grid(
+  mtry = floor(seq(2, sqrt(length(x_cols))*2, length.out = 6))
+)
+
+set.seed(1234)
+rf_fit <- train(
+  x = train[, x_cols],
+  y = train[[target_col]],
+  method = "rf",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneGrid = grid_rf,
+  ntree = 500,
+  importance = TRUE
+)
+
+print(rf_fit)
+
+plot(rf_fit, main = "Performance ROC en fonction de mtry (Random Forest)")
+```
+Notre premier modèle repose sur l’implémentation classique du Random Forest. Nous avons testé différentes valeurs de l’hyperparamètre mtry, qui correspond au nombre de variables candidates sélectionnées aléatoirement à chaque division de nœud. L’évaluation a été réalisée selon le schéma de validation décrit précédemment. Les résultats montrent que la performance, mesurée par l’AUC (ROC), diminue lorsque mtry augmente. Le maximum est atteint pour mtry = 2 avec une AUC de 0,796, puis elle baisse progressivement jusqu’à 0,761 pour mtry = 6. En effet un nombre trop important de variables à chaque split réduit la diversité des arbres et favorise le sur-apprentissage, d'pù cette évolution de l'AUC. Le modèle optimal retenu est donc celui avec mtry = 2. Il offre également le meilleur compromis entre sensibilité (0,761) et spécificité (0,721). Ce réglage maximise la capacité discriminante de la forêt aléatoire et améliore la détection des souscripteurs, objectif principal de notre étude.
+
+## Imlplémentation B
+```{r}
+grid_rg <- expand.grid(
+  mtry = floor(seq(2, sqrt(length(x_cols))*2, length.out = 6)),
+  splitrule = c("gini", "extratrees"),
+  min.node.size = c(1, 5, 10)     
+)
+
+set.seed(1234)
+rg_fit <- train(
+  x = train[, x_cols],
+  y = train[[target_col]],
+  method = "ranger",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneGrid = grid_rg,
+  num.trees = 500,
+  importance = "permutation",
+  respect.unordered.factors = "partition"
+)
+
+print(rg_fit)
+
+plot(rg_fit, main = "Performance ROC selon hyperparamètres (Ranger)")
+```
+Notre second modèle repose sur l’implémentation Ranger, choisie car elle permet un réglage plus fin des hyperparamètres, même si son coût de calcul est plus élevé que celui du Random Forest. Elle offre notamment la possibilité de contrôler la structure des arbres via différents paramètres : min.node.size (taille minimale des nœuds terminaux, jouant un rôle d’élagage implicite), splitrule (critère de séparation, gini ou extratrees), ainsi que mtry (nombre de variables candidates par split). Ces paramètres ont été optimisés à l’aide de notre schéma de validation. Les résultats montrent que la performance est maximale pour la configuration suivante : mtry = 2, splitrule = extratrees et min.node.size = 1, avec une AUC de 0,801. Cette combinaison favorise la diversité des arbres (faible mtry), des séparations plus aléatoires (extratrees) et une granularité plus fine (nœuds très petits), ce qui améliore la capacité de discrimination du modèle. À l’inverse, lorsque mtry augmente ou que min.node.size devient trop élevé, l’AUC décroît car la forêt perd en diversité et en précision. Le modèle optimal retenu permet ainsi de maximiser la détection des souscripteurs tout en maintenant un bon équilibre entre sensibilité (0,740) et spécificité (0,741).
+
+## Sélection du modèle le plus optimal
+
+```{r}
+auc_rf <- max(rf_fit$results$ROC)
+auc_rg <- max(rg_fit$results$ROC)
+
+cat("AUC RandomForest :", round(auc_rf, 4), "\n")
+cat("AUC Ranger       :", round(auc_rg, 4), "\n")
+
+if (auc_rf >= auc_rg) {
+  best_model <- rf_fit
+  model_name <- "Random Forest (package randomForest)"
+} else {
+  best_model <- rg_fit
+  model_name <- "Ranger (package ranger)"
+}
+
+cat("==> Modèle retenu :", model_name, "\n")
+cat("Hyperparamètres optimaux :\n")
+print(best_model$bestTune)
+```
+La comparaison des deux implémentations met en évidence que la forêt aléatoire (randomForest) atteint une AUC maximale de 0,796, tandis que l’implémentation Ranger obtient un score légèrement supérieur, à 0,802. Bien que l’écart soit limité, il souligne l’intérêt de Ranger, qui offre une plus grande flexibilité dans l’ajustement des hyperparamètres. Le modèle optimal retenu correspond à la configuration mtry = 2, splitrule = extratrees et min.node.size = 1. Ce paramétrage favorise une forte diversité entre les arbres et améliore la capacité discriminante de la forêt sur un jeu de données déséquilibré. Ainsi, le modèle Ranger est jugé plus performant et mieux adapté pour la suite de l’analyse, puisqu’il maximise la détection des souscripteurs tout en conservant une bonne généralisation.
+
+## Evaluation sur le jeu de test
+
+```{r}
+pred_prob_rf <- predict(rf_fit, newdata = test, type = "prob")[, "yes"]
+pred_prob_rg <- predict(rg_fit, newdata = test, type = "prob")[, "yes"]
+
+pred_cls_rf <- factor(ifelse(pred_prob_rf >= 0.5, "yes", "no"), levels = c("no","yes"))
+pred_cls_rg <- factor(ifelse(pred_prob_rg >= 0.5, "yes", "no"), levels = c("no","yes"))
+
+cm_rf <- confusionMatrix(pred_cls_rf, test[[target_col]], positive = "yes")
+cm_rg <- confusionMatrix(pred_cls_rg, test[[target_col]], positive = "yes")
+
+cat("=== RandomForest ===\n")
+print(cm_rf)
+cat("\n=== Ranger ===\n")
+print(cm_rg)
+
+roc_rf <- pROC::roc(response = test[[target_col]], predictor = pred_prob_rf,
+                    levels = c("no","yes"), direction = "<")
+roc_rg <- pROC::roc(response = test[[target_col]], predictor = pred_prob_rg,
+                    levels = c("no","yes"), direction = "<")
+
+auc_rf <- pROC::auc(roc_rf)
+auc_rg <- pROC::auc(roc_rg)
+
+cat("\nAUC RandomForest (test) :", round(auc_rf, 3), "\n")
+cat("AUC Ranger (test)       :", round(auc_rg, 3), "\n")
+
+plot(roc_rf, legacy.axes = TRUE, col = "blue",
+     main = "Courbes ROC sur le jeu de test - RandomForest vs Ranger")
+plot(roc_rg, add = TRUE, col = "red")
+legend("bottomright",
+       legend = c(paste0("RandomForest AUC=", round(auc_rf,3)),
+                  paste0("Ranger AUC=", round(auc_rg,3))),
+       col = c("blue", "red"), lty = 1, cex = 0.9)
+```
+L’évaluation finale sur le jeu de test montre que les deux implémentations de forêts aléatoires obtiennent des performances très proches : une AUC de 0,825 pour RandomForest et de 0,821 pour Ranger. Ce résultat nuance l’analyse précédente, où Ranger apparaissait comme le plus performant en validation croisée. L’écart observé reste faible et non significatif, ce qui confirme la robustesse des deux approches face au problème étudié. Le choix final peut donc s’appuyer sur des critères pratiques : Ranger offre davantage de flexibilité dans le réglage des hyperparamètres, tandis que RandomForest affiche une légère supériorité sur le test. Dans les deux cas, la capacité de discrimination est jugée satisfaisante.
+
+L’analyse des matrices de confusion montre que RandomForest atteint une accuracy de 77,2 %, avec une sensibilité de 0,799 et une spécificité de 0,763. De son côté, Ranger présente une accuracy et une une spécificité inférieures, mais leurs sensibilités sont similaires. Dans les deux cas, la capacité à repérer correctement les clients susceptibles de souscrire reste satisfaisante. Cet aspect est particulièrement important dans notre contexte marketing. Il est préférable de détecter un maximum de souscripteurs potentiels, quitte à inclure par erreur certains clients qui ne s’abonneront finalement pas.
+
+Ces résultats confirment que les deux méthodes sont robustes et adaptées, mais montrent également que le gain de performance de Ranger observé en validation croisée ne se retrouve pas de manière significative sur le jeu de test. Le choix entre les deux implémentations peut donc se fonder sur des critères pratiques. Par exemple, RandomForest offre des performances légèrement supérieures en AUC et en spécificité, tandis que Ranger reste intéressant pour sa flexibilité dans l’optimisation des hyperparamètres.
+
+## Importance des variables
+```{r}
+
+# Importance des variables - RandomForest
+varImp_rf <- varImp(rf_fit, scale = TRUE)
+print(varImp_rf)
+plot(varImp_rf, top = 15, main = "Importance des variables - RandomForest")
+
+varImp_rg <- varImp(rg_fit, scale = TRUE)
+print(varImp_rg)
+plot(varImp_rg, top = 15, main = "Importance des variables - Ranger")
+```
+L’analyse de l’importance des variables met en évidence des résultats cohérents entre les deux implémentations de forêts aléatoires. Dans les deux cas, la variable poutcome apparaît comme la plus déterminante dans la prédiction de la souscription à un dépôt à terme.
+
+La variable housing arrive en seconde position, suivie de loan, de l’âge et du solde du compte. Ces variables traduisent des facteurs socio-économiques influençant directement la probabilité d’épargne ou de souscription.
+
+Les variables marital, education, contact et default ont une importance plus faible, mais contribuent néanmoins à affiner le modèle en segmentant les profils. La cohérence entre RandomForest et Ranger renforce la robustesse de l’interprétation, bien que l’ordre exact des variables secondaires varie légèrement.
+
+En conclusion, ces résultats montrent que l’historique des interactions marketing (poutcome) et les variables financières liées aux crédits et au patrimoine (housing, loan, balance) constituent les principaux déterminants de la souscription, ce qui est cohérent avec les attentes d’un ciblage marketing bancaire.
