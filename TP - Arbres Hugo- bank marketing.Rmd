@@ -119,7 +119,7 @@ for (var in factor_vars) {
   )
 }
 ```
-L’analyse univariée met en évidence un fort déséquilibre dans les données : la majorité des clients n’ont pas souscrit à un dépôt à terme (class = no), et la variable poutcome est dominée par la modalité failure. Du côté des variables numériques, l’âge est principalement concentré entre 30 et 40 ans, tandis que le solde des comptes présente une distribution asymétrique, avec la majorité des valeurs proches de zéro mais quelques soldes très élevés. Ces constats soulignent à la fois un déséquilibre de classes et la présence de valeurs extrêmes, deux éléments à prendre en compte pour la modélisation.
+L’analyse univariée met en évidence un fort déséquilibre dans les données : la majorité des clients n’ont pas souscrit à un dépôt à terme (class = no), et la variable poutcome est dominée par la modalité failure. Du côté des variables numériques, l’âge est principalement concentré entre 30 et 40 ans, tandis que le solde des comptes présente une distribution asymétrique, avec la majorité des valeurs proches de zéro mais quelques soldes très élevés. Ces constats soulignent à la fois un déséquilibre de classes et la présence de valeurs extrêmes. Les valeurs extrêmes ne posent pas de problèmes car les arbres de décision et les forêts aléatoires n'y sont pas sensibles. En revanche, ce déséquilibre issu de la variable class est à prendre en compte pour la modélisation.
 
 Cette première analyse univariée permet dès le départ de visualiser la distribution des variables et d’en obtenir une première compréhension.
 
