@@ -23,7 +23,7 @@ data <- data %>%
   mutate(across(where(is.character), as.factor))
 
 str(data)
-
+summary(data)
 # --- 3. Distribution de la variable cible ---
 ggplot(data, aes(x = class, fill = class)) +
   geom_bar() +

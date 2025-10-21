@@ -23,7 +23,7 @@ Gère bien les données de grande dimension.
 
 ```{r}
 data<- read.csv("KPIs for telecommunication.csv", sep = ";")
-data
+
 ```
 
 ```{r}
@@ -36,6 +36,63 @@ print(round(missing_count / nrow(data) * 100, 2))
 
 ```
 
+
+## Gestion des valeurs manquantes (KPI4, KPI6, KPI9)
+
+Pour traiter ces donnees manquantes, nous allons dans un premier temps envisager plusieurs approches :
+
+* Remplacement par la **moyenne** ou la **mediane**.
+* Utilisation de la methode des **k plus proches voisins (kNN)**, apres avoir examine la matrice de correlation afin de verifier si les autres KPI influencent les KPI4, KPI6 et KPI9 (qui presentent respectivement 36.70 %, 20.66 % et 27.99 % de valeurs manquantes).
+* Suppression eventuelle des variables, si aucune methode d’imputation n’est pertinente.
+
+
+#1. KNN
+```{r}
+# Matrice de corrélation sur données complètes
+
+data_complete <- na.omit(data)
+
+# Calcul et visualisation de la corrélation
+cor_matrix <- cor(data_complete)
+
+
+# Visualisation
+library(corrplot)
+
+corrplot(cor_matrix, method = "color", type = "upper", 
+         addCoef.col = "black", number.cex = 0.7,
+         tl.col = "black", tl.srt = 45,
+         title = "Matrice de corrélation (données complètes)")
+
+# Corrélations avec les KPI à imputer
+cat("\nCorrélations avec KPI4:\n")
+print(sort(cor_matrix[, "KPI4"], decreasing = TRUE)[c(1,2,3)])
+
+cat("\nCorrélations avec KPI6:\n")
+print(sort(cor_matrix[, "KPI6"], decreasing = TRUE)[c(1,2,3)])
+
+cat("\nCorrélations avec KPI9:\n")
+print(sort(cor_matrix[, "KPI9"], decreasing = TRUE)[c(1,2,3)])
+```
+
+Apres analyse, aucune des variables (KPI4, KPI6, KPI9) n’est correlee de maniere significative avec les autres. Dans ce cas, l’utilisation du kNN ou d’un modele de regression n’est pas adaptee, car ces methodes reposent justement sur des relations entre variables.
+
+En observant les statistiques descriptives, on constate que la mediane est bien plus representative pour ces indicateurs :
+
+* **KPI4** : min = 80, 1er quartile = 100, max = 100 → la valeur 80 est un outlier ; il est logique d’imputer les valeurs manquantes par 100.
+* Le meme raisonnement s’applique a **KPI6** et **KPI9**.
+
+**En conclusion**, avant d’utiliser des methodes plus complexes (comme le kNN, plus couteux en temps de calcul), il est preferable d’analyser les statistiques descriptives. Celles-ci permettent souvent d’opter pour une approche simple, robuste et coherente.
+
+Ainsi, nous choisissons de **ne supprimer aucune observation** et de **remplacer toutes les valeurs manquantes par la mediane de la colonne concernee**.
+
+```{r}
+library(dplyr)
+
+data_final <- data %>%
+  mutate(across(everything(), ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x)))
+
+```
 
 ```{r}
 # Détection des outliers
@@ -84,91 +141,54 @@ for(feature in names(outliers_list)) {
 }
 ```
 
-Avec ces 747 lignes de potentiel outlier liste, on va pouvoir les comparer avec les résultats des modèles isolation forest qu'on va générer. On remarque un nombre important de ligne considéré comme outlier parce que KPI1 vaut 0 environ 330 sur 1300. Doivent-ils être tous considérer comme des outliers ? Non. Pareil pour KPI9 ? 
-Le modèle qui sera considéré comme le meilleur sera celui qui ne considère pas outlier leslignes pour laquelles KPI1 = 0 met la ligne comme anomalie. Et le meilleur celui. 
-
-Pour les données manquantes on va dans un premier temps essayer de les prédire avec 3 méthodes.
- - La moyenne
- - Les K plus proches voisins avant on va calculer la matrice de corrélation pour voir si les autres KPI ont une incidence sur respectivement les KPI4, KPI6, KPI9 qui ont repectivement 36.70% 20.66% et 27.99% d'omission. Il s'agira de voir aussi l'importance d'une normalisation avant d'utiliser l'algorithme pour la similarité. 
- - on les enlève ? 
- 
-#1. KNN
 ```{r}
-# Matrice de corrélation sur données complètes
+# Préparer les données pour le plot
+features_with_outliers <- names(outliers_list)[sapply(outliers_list, function(x) length(x) > 0)]
 
-data_complete <- na.omit(data)
+par(mfrow = c(2, ceiling(length(features_with_outliers)/2)))
 
-# Calcul et visualisation de la corrélation
-cor_matrix <- cor(data_complete)
+for(feature in features_with_outliers) {
+  valeurs_normales <- data[-outliers_list[[feature]], feature]
+  valeurs_outliers <- data[outliers_list[[feature]], feature]
+  
+  boxplot(list(Normal = valeurs_normales, Outliers = valeurs_outliers),
+          main = feature,
+          col = c("lightblue", "coral"),
+          ylab = "Valeur",
+          cex.main = 0.9)
+}
 
-
-# Visualisation
-library(corrplot)
-
-corrplot(cor_matrix, method = "color", type = "upper", 
-         addCoef.col = "black", number.cex = 0.7,
-         tl.col = "black", tl.srt = 45,
-         title = "Matrice de corrélation (données complètes)")
-
-# Corrélations avec les KPI à imputer
-cat("\nCorrélations avec KPI4:\n")
-print(sort(cor_matrix[, "KPI4"], decreasing = TRUE)[c(1,2,3)])
-
-cat("\nCorrélations avec KPI6:\n")
-print(sort(cor_matrix[, "KPI6"], decreasing = TRUE)[c(1,2,3)])
-
-cat("\nCorrélations avec KPI9:\n")
-print(sort(cor_matrix[, "KPI9"], decreasing = TRUE)[c(1,2,3)])
+par(mfrow = c(1, 1))
 ```
+## Analyse critique de la détection d'outliers par la méthode IQR
 
-Aucune des variables (KPI4,6,9) n'est corrélé avec aucune autres. Donc l'utilisation de l'algorithme des KNN est compromis.  
-Pour KPI4, 6, 9 étant donné que la description statistique au dessus on voit bien que les valeurs médiane feront très bien l'affaire. Pour KPI4 il y a min à 80 mais 1er quantile à 100 et max à 100. On comprend bien qu'il faille donné 100 aux valeurs NA et que la ligne avec 80 est un outlier. Même raisonnement avec KPI6 et 9. 
+En comparant les statistiques des outliers détectés avec la méthode IQR (seuil 1.5 × IQR) et celles des valeurs normales, on observe plusieurs problèmes majeurs :
 
-Moral : au lieu de partir sur une technique difficile KNN (temps de calcul plus long) et calculer la matrice de corrélations pour voir si les KNN est une bonne méthode. Il vaut mieux regarder la statistique descriptive qui permet d'utiliser une méthode plus simple. 
+- **KPI9** : Les outliers détectés ont des statistiques globales très proches des non-outliers, suggérant une sur-détection.
+- **KPI8 et KPI6** : Même constat, la méthode IQR capture trop de valeurs qui ne sont pas réellement aberrantes.
 
-Faut-il supprimer les colonnes puissent qu'elle n'apporte pas plus d'information ? Ou faut-il l'a garder pour mettre en évidence l'anomalie du KPI = 80 ? 
+Cette méthode statistique classique s'avère **inadaptée à notre jeu de données**. Cependant, elle nous fournit une baseline de **`r length(outliers_detected)` lignes potentiellement aberrantes** qui servira de référence pour évaluer les modèles Isolation Forest.
 
+### Cas particulier : KPI1 = 0
 
-On convertit tous les NA en la médiane de la colonne considéré. 
-```{r}
-library(dplyr)
+Un problème majeur émerge : environ **330 lignes sur `r nrow(data)` (25%)** sont marquées comme outliers uniquement parce que **KPI1 = 0**. 
 
-data_final <- data %>%
-  mutate(across(everything(), ~ifelse(is.na(.x), median(.x, na.rm = TRUE), .x)))
+> **Question critique** : Doit-on considérer toutes ces lignes comme des anomalies ? **Non, je ne pense pas**. 
 
-```
+Une valeur nulle pour KPI1 peut être légitime selon le contexte métier (absence d'activité, période de maintenance, etc.). Il en va de même pour KPI9. Étant donné qu'on a pas le contexte, on ne peut pas conclure. 
 
+### Critère de sélection du meilleur modèle
 
+Cette méthode pourra quand même nous aider pour juger les modèles Isolation Forest. D'après notre interprétation, le modèle devra : 
 
-```{r}
-library(isotree)
-library(ggplot2)
+1. **Ne pas classifier systématiquement comme anomalie** les lignes où KPI1 = 0. 
+Les observations avec KPI1 = 0 ne font pas ressortir en général d'autres potentielles outliers pour les autres feature en partant de ce principe. On va classer les modèles de sorte que le meilleur soit celui qui :
+**Maximise le F1-score** en identifiant les lignes avec réellement 3+ features aberrantes simultanément. 
 
-# Division train/test (70/30)
-set.seed(123)
-splitter   = data_final %>%
-  rsample::initial_split(prop = 0.7)
-train = rsample::training(splitter)
-test  = rsample::testing(splitter)
-
-iso = isolationForest$new(sample_size = 245)
-iso$fit(pima_train)
-
-scores_train = train %>%
-  iso$predict() %>%
-  arrange(desc(anomaly_score))
-
-scores_train
-
-scores_test = test %>%
-  iso$predict() %>%
-  arrange(desc(anomaly_score))
-
-scores_test
+Le meilleur modèle sera donc celui qui fait preuve de **discernement contextuel** et ne se laisse pas piéger par des valeurs nulles fréquentes mais potentiellement normales.
 
 
-```
-
+Dans la prochaine partie on va tester l'influence des hyperparamètres sur 4 différents modèles 
 ```{r}
 library(isotree)
 library(ggplot2)
@@ -262,23 +282,115 @@ ggplot(all_scores_df, aes(x = score, fill = model)) +
   theme_minimal()
 ```
 
-```{r}
-print(comparison_results)
+## Influence des hyperparamètres sur les modèles Isolation Forest
+
+### Configuration des modèles testés
+
+Nous testons 4 configurations différentes pour comprendre l'impact des hyperparamètres sur la détection d'anomalies :
+```{r, echo=TRUE}
+configs <- data.frame(
+  model = c("Modèle 1", "Modèle 2", "Modèle 3", "Modèle 4"),
+  ntrees = c(100, 500, 500, 250),
+  sample_size = c(100, 100, 512, 256),
+  ndim = c(1, 1, 3, 2)
+)
+knitr::kable(configs, caption = "Configuration des hyperparamètres testés")
 ```
-On trouve que le modèle avec le plus de variance est le modèle 1. On s'en doutait : 100 arbres seulement par rapport à 500 ou 250 pour les autres modèles. ndim = 1 donc plus de variance aussi dépend du jeu de données utilisé et pareil sample size 100 contre 256 ou 512 pour d'autres forêt. Le range est maximal pour le modèle 3 : 0.4063617 pourtant son q95 = 0.4669773 est bas, c'est la modèle 1 avec 0.5719 qui a le plus haut. C'est donc potentiellement le modèle 1 parmi les 4 qui est le meilleur.  
+
+### Rôle des hyperparamètres
+
+**1. `ntrees` (Nombre d'arbres)**
+
+- **Principe** : Nombre d'arbres dans la forêt d'isolation
+- **Impact** : Plus d'arbres = prédictions plus stables et robustes, mais temps de calcul accru
+- **Recommandation** : Généralement entre 100 et 500 arbres
+
+**2. `sample_size` (Taille d'échantillon)**
+
+- **Principe** : Nombre d'observations utilisées pour construire chaque arbre
+- **Impact** : 
+  - **Petit sample_size** (100-256) : Arbres plus petits, détection fine des anomalies, variance élevée
+  - **Grand sample_size** (512+) : Arbres plus profonds, modèle plus stable mais peut manquer des anomalies subtiles
+- **Recommandation** : Typiquement 256 observations pour un bon compromis
+
+**3. `ndim` (Nombre de dimensions par split)**
+
+- **Principe** : Nombre de features considérées simultanément pour chaque division de l'arbre
+- **Impact** :
+  - **ndim = 1** : Splits univariés (une feature à la fois), grande variance, sensible aux outliers individuels
+  - **ndim > 1** : Splits multivariés, capture mieux les anomalies contextuelles complexes
+- **Recommandation** : ndim = 1 pour détecter des anomalies simples, ndim = 2-3 pour des patterns multivariés
+
+### Analyse comparative des résultats
+```{r}
+knitr::kable(comparison_results, 
+             digits = 4,
+             caption = "Métriques de performance des 4 modèles")
+```
+
+#### Observations clés
+
+**Modèle 1** (ntrees=100, sample_size=100, ndim=1) :
+
+- **Variance la plus élevée** (`r round(comparison_results$variance[1], 4)`) : attendu avec seulement 100 arbres et ndim=1
+- **Q95 le plus haut** (`r round(comparison_results$q95[1], 4)`) : discrimination plus agressive entre normal/anomalie
+- **Interprétation** : Modèle le plus "sensible", identifie plus facilement les anomalies mais risque de faux positifs
+
+**Modèle 3** (ntrees=500, sample_size=512, ndim=3) :
+
+- **Range maximal** (`r round(comparison_results$range[3], 4)`) : meilleure séparation globale des scores
+- **Q95 plus bas** (`r round(comparison_results$q95[3], 4)`) : seuil d'anomalie plus conservateur
+- **Interprétation** : Modèle plus stable et robuste, capture des anomalies multivariées complexes
+
+**Modèle 2 vs Modèle 1** :
+
+- Même configuration (ndim=1, sample_size=100) mais **5× plus d'arbres**
+- Variance réduite grâce à l'effet d'ensemble (averaging)
+- Q95 inférieur : prédictions plus conservatives
+
+### Quel est le meilleur modèle ?
+
+Sur la base de ces métriques exploratoires :
+
+> **Le Modèle 1 semble le plus prometteur** pour notre tâche, avec son Q95 élevé et sa forte variance indiquant une bonne capacité de discrimination.
+
+**Cependant**, cette conclusion préliminaire doit être **validée** en comparant les prédictions avec nos **`r length(outliers_detected)` outliers détectés par la méthode IQR** (lignes avec ≥3 features aberrantes). Le meilleur modèle sera celui qui :
+
+1. Maximise le **F1-score** sur ces outliers de référence
+2. Ne sur-détecte pas les lignes avec KPI1 = 0 comme anomalies systématiques
+3. Capture des anomalies **multivariées complexes** plutôt que des seuils univariés
+
+Cette validation fera l'objet de la section suivante.
+
+Pour garantir une évaluation robuste, nous effectuons un **split stratifié** sur la variable `has_multiple_outliers` (indiquant si une ligne contient ≥3 outliers IQR), assurant ainsi que les ensembles train et test maintiennent la **même proportion d'anomalies potentielles** (~`r round(mean(data_final$has_multiple_outliers)*100, 1)`%).
 
 
 ```{r}
+# Créer les variables de stratification
 data_final$has_multiple_outliers <- 1:nrow(data_final) %in% outliers_detected
+data_final$has_kpi1_zero <- data_final$KPI1 == 0
+
+# Combiner les deux critères de stratification
+data_final$strata_group <- paste0(
+  ifelse(data_final$has_multiple_outliers, "outlier", "normal"),
+  "_",
+  ifelse(data_final$has_kpi1_zero, "kpi1_0", "kpi1_non0")
+)
 
 set.seed(123)
 splitter <- data_final %>%
-  rsample::initial_split(prop = 0.7, strata = has_multiple_outliers)
+  rsample::initial_split(prop = 0.7, strata = strata_group)
 
 train <- rsample::training(splitter)
-test  <- rsample::testing(splitter)
+test <- rsample::testing(splitter)
 
-outliers_list_test <- lapply(test[, -ncol(test)], detect_outliers)  # Exclure la colonne has_multiple_outliers
+# Vérification des proportions
+cat("Proportion KPI1=0 dans train:", round(mean(train$has_kpi1_zero)*100, 2), "%\n")
+cat("Proportion KPI1=0 dans test:", round(mean(test$has_kpi1_zero)*100, 2), "%\n")
+
+# Recalculer outliers sur test (exclure les colonnes ajoutées)
+cols_to_exclude <- c("has_multiple_outliers", "has_kpi1_zero", "strata_group")
+outliers_list_test <- lapply(test[, !names(test) %in% cols_to_exclude], detect_outliers)
 lignes_outliers_test <- unique(unlist(outliers_list_test))
 
 outliers_detected_test <- c()
@@ -289,44 +401,63 @@ for(ligne in lignes_outliers_test) {
   }
 }
 
-cat("Outliers détectés dans test (>= 3):", length(outliers_detected_test), "\n")
+cat("Outliers détectés dans test set (>= 3 features):", length(outliers_detected_test), "\n")
 
+# ANALYSE : Combien d'outliers détectés ont KPI1 = 0 ?
+outliers_with_kpi1_zero <- sum(test$KPI1[outliers_detected_test] == 0)
+cat("Parmi les", length(outliers_detected_test), "outliers détectés:\n")
+cat("  -", outliers_with_kpi1_zero, "ont KPI1 = 0 (",
+    round(outliers_with_kpi1_zero/length(outliers_detected_test)*100, 1), "%)\n")
+cat("  -", length(outliers_detected_test) - outliers_with_kpi1_zero, 
+    "ont KPI1 ≠ 0\n\n")
+
+# Grille de paramètres
 params_grid <- expand.grid(
   ntrees = c(100, 250, 500),
   sample_size = c(128, 256, 512),
   ndim = c(1, 2, 3)
 )
 
-compare_outliers <- function(predicted, detected) {
+# Fonction de comparaison améliorée
+compare_outliers <- function(predicted, detected, test_data) {
   communs <- intersect(predicted, detected)
   
   # Taux de détection
   taux <- length(communs) / length(detected) * 100
   
   # F1-score
-  precision <- length(communs) / length(predicted)
+  precision <- ifelse(length(predicted) > 0, length(communs) / length(predicted), 0)
   recall <- length(communs) / length(detected)
-  f1 <- 2 * (precision * recall) / (precision + recall)
+  f1 <- ifelse(precision + recall > 0, 2 * (precision * recall) / (precision + recall), 0)
   
-  return(list(communs = length(communs), taux = taux, f1 = f1))
+  # NOUVEAU : Analyser KPI1 = 0 dans les prédictions
+  kpi1_zero_predicted <- sum(test_data$KPI1[predicted] == 0, na.rm = TRUE)
+  prop_kpi1_zero <- ifelse(length(predicted) > 0, kpi1_zero_predicted / length(predicted), 0)
+  
+  return(list(
+    communs = length(communs), 
+    taux = taux, 
+    f1 = f1,
+    kpi1_zero_count = kpi1_zero_predicted,
+    kpi1_zero_prop = prop_kpi1_zero * 100
+  ))
 }
 
+# Boucle d'évaluation
 results <- data.frame()
 
 for(i in 1:nrow(params_grid)) {
-  cat("Test modèle", i, "/", nrow(params_grid), "\n")
-  
-  model_temp <- isolation.forest(train[, -ncol(train)],  # Exclure has_multiple_outliers
+  model_temp <- isolation.forest(train[, !names(train) %in% cols_to_exclude], 
                                  ntrees = params_grid$ntrees[i],
                                  sample_size = params_grid$sample_size[i],
                                  ndim = params_grid$ndim[i])
   
-  scores_test <- predict(model_temp, test[, -ncol(test)])
+  scores_test <- predict(model_temp, test[, !names(test) %in% cols_to_exclude])
   seuil <- quantile(scores_test, 0.95)
   lignes_predites <- which(scores_test > seuil)
   
-  # Comparaison
-  comp_result <- compare_outliers(lignes_predites, outliers_detected_test)
+  # Comparaison avec analyse KPI1 = 0
+  comp_result <- compare_outliers(lignes_predites, outliers_detected_test, test)
   
   results <- rbind(results, data.frame(
     ntrees = params_grid$ntrees[i],
@@ -334,21 +465,60 @@ for(i in 1:nrow(params_grid)) {
     ndim = params_grid$ndim[i],
     communs = comp_result$communs,
     taux_detection = comp_result$taux,
-    f1_score = comp_result$f1
+    f1_score = comp_result$f1,
+    kpi1_zero_count = comp_result$kpi1_zero_count,
+    kpi1_zero_pct = comp_result$kpi1_zero_prop
   ))
 }
 
-# 6. CLASSEMENT DES MODÈLES
+# Classement des modèles
 results <- results[order(-results$f1_score), ]
+
 cat("\n### Top 5 modèles (selon F1-score)\n")
 print(head(results, 5))
+
+cat("\n### Bottom 5 modèles\n")
 print(tail(results, 5))
+
+cat("Le meilleur modèle prédit", results$kpi1_zero_count[1], 
+    "outliers avec KPI1=0 (",
+    round(results$kpi1_zero_pct[1], 1), "% de ses prédictions)\n")
 ```
 
-différence de 4 outliers commun entre les modèles testé. 
 
+Les 27 configurations testées présentent une convergence remarquable, avec un écart maximal de 4 outliers communs. L'analyse révèle qu'aucun modèle n'identifie les observations avec KPI1 = 0 comme anomalies de manière systématique, démontrant ainsi leur capacité à reconnaître un cluster comme n'étant pas une véritbale anomalie. Cette robustesse contextuelle, combinée à un taux de concordance significatif avec les outliers IQR multivariés (≥3 features aberrantes), confirme bien l'utilité des forêts d'isolation pour la détection d'anomalies complexes dans notre jeu de données.
+
+Une analyse des hyperparamètres révèle que les configurations les plus performantes partagent trois caractéristiques communes :
+
+1. **ndim = 1** : Les splits univariés (une feature à la fois) surpassent les approches multivariées (ndim = 2-3)
+2. **sample_size faible** (128-256) : Des échantillons réduits génèrent des arbres peu profonds, plus sensibles aux valeurs extrêmes
+3. **ntrees modéré** (100-250) : Un nombre d'arbres limité maintient une variance élevée, favorisant la discrimination
+
+### Lien entre faible corrélation et performance des splits univariés
+
+L'analyse de corrélation préalable révélait des **corrélations faibles à modérées** entre les KPIs. Cette structure de données explique directement pourquoi les modèles avec **ndim = 1** surpassent ceux avec ndim = 2-3 :
+
+**Principe théorique :**
+- **Splits univariés (ndim = 1)** : Détectent les anomalies comme des valeurs extrêmes sur une feature isolée
+- **Splits multivariés (ndim > 1)** : Détectent les anomalies contextuelles nécessitant la combinaison de plusieurs features
+
+**Application à nos données :**
+
+Lorsque les variables sont **fortement corrélées**, une observation peut être normale sur chaque feature prise individuellement, mais anormale dans leur combinaison (ex : température et pression atmosphérique). Les splits multivariés excellent dans ce cas.
+
+À l'inverse, avec de **faibles corrélations**, les variables évoluent de manière **indépendante**. Les anomalies se manifestent donc principalement comme :
+- Des valeurs extrêmes sur KPI1 seul
+- Des valeurs aberrantes sur KPI9 seul
+- Etc.
+
+**Conclusion :**
+La faible structure de corrélation de notre jeu de données rend les **anomalies univariées** (détectables par ndim = 1) plus fréquentes que les **anomalies contextuelles multivariées** (nécessitant ndim > 1). Cela confirme la cohérence entre :
+1. La structure de corrélation des données
+2. La performance des hyperparamètres
+3. La nature des outliers détectés par la méthode IQR (seuils univariés)
 
 ```{r}
+
 # Récupérer les 3 modèles à analyser
 best_model_1 <- results[1, ]
 best_model_2 <- results[2, ]

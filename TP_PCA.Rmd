@@ -1,0 +1,642 @@
+---
+title: "TP - Décomposition en Composantes Principales (ACP)"
+author: "Munoz Enzo"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6)
+```
+# Réponse aux questions du TD
+
+On a obtenu  à la question 6,en utilisant la formule du TD, une qualité de représentation du point M2 par le 1er vecteur Q21 = 0.5
+
+Question 7 : On obtient Q61 = 0.088 donc le point M6 est moins bien représenté que le point M2.
+
+Question 8: Stabilité de l'ACP
+En ajoutant M6 = (0,10) qui est un point très éloigné du nuage initial, les axes vont changer significativement.
+
+En effet, l'axe principal est déterminé par la direction de plus grande variance. Ici, M6 introduit une variance très importante dans la direction verticale
+
+Le nouvel axe principal va probablement s'aligner davantage avec la direction verticale pour capturer cette forte variance
+
+Les formules de covariance et d'inertie montrent qu'un point éloigné a un poids important dans le calcul des directions principales
+
+L'ACP est donc sensible aux points extrêmes qui peuvent complètement modifier l'orientation des axes. 
+
+# 1. Introduction
+
+Ce TP consiste à recoder la décomposition en composantes principales (ACP) en dimension p =8 sans utiliser de packages R dédiés à l'ACP, puis l'appliquer sur le jeu de données `data_PDE20.csv`.
+
+# 2. Chargement et Prétraitement des Données
+
+## 2.1 Chargement des données
+
+```{r load_data}
+data <- read.csv("data_PDE20.csv", header = TRUE, sep = ";")
+data <- data[, -c(1, 10)]
+data[] <- lapply(data, function(x) as.numeric(gsub(",", ".", x)))
+data
+```
+Il faut convertir les colonnes en nombre. La première et la dernière colonne doit être supprimer.  
+## 2.2 Analyse exploratoire
+
+```{r exploration}
+# Dimensions du jeu de données
+cat("Dimensions:", dim(data), "\n")
+cat("Nombre de lignes:", nrow(data), "\n")
+cat("Nombre de colonnes:", ncol(data), "\n\n")
+
+# Résumé statistique
+summary(data)
+```
+
+## 2.3 Traitement des données manquantes
+
+```{r missing_values}
+# Vérification des valeurs manquantes
+missing_count <- colSums(is.na(data))
+
+cat("\nPourcentage de valeurs manquantes:\n")
+print(round(missing_count / nrow(data) * 100, 2))
+
+```
+
+## 2.4 Détection des valeurs aberrantes
+
+```{r outliers}
+
+par(mfrow = c(2, ceiling(ncol(data)/2)))
+for(i in 1:ncol(data)) {
+  boxplot(data[,i], main = colnames(data)[i], col = "lightblue")
+}
+par(mfrow = c(1,1))
+
+# Fonction pour détecter les outliers avec la méthode IQR
+detect_outliers <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower <- Q1 - 1.5 * IQR
+  upper <- Q3 + 1.5 * IQR
+  return(sum(x < lower | x > upper, na.rm = TRUE))
+}
+
+outliers_count <- sapply(data, detect_outliers)
+cat("\nNombre de valeurs aberrantes par variable:\n")
+print(outliers_count)
+```
+La 11ème et la 10ème row sont  peut être des outliers avec desdonées aberrantes pour respectivement, x3 et x8. Je décide de garder ces valeurs pour la suite même si elles peuvent venir d'une erreur. 
+
+# 3. Implémentation de l'ACP
+
+## 3.1 Fonction ACP personnalisée
+
+```{r acp_function}
+# Fonction pour calculer l'ACP sans packages dédiés
+acp <- function(X, center = TRUE) {
+  
+  # Vérifications
+  if(!is.matrix(X)) {
+    X <- as.matrix(X)
+  }
+  
+  n <- nrow(X)
+  p <- ncol(X)
+  
+  # Étape 1: Centrage et réduction des données
+  if(center) {
+    means <- colMeans(X)
+    X_centered <- sweep(X, 2, means, "-")
+  } else {
+    means <- rep(0, p)
+    X_centered <- X
+  }
+  
+  
+  #Calcul de la matrice de covariance
+  # Matrice de covariance: (1/n) * t(X) %*% X
+  cov_matrix <- (1/n) * t(X_centered) %*% X_centered
+  
+  #Décomposition en valeurs propres et vecteurs propres
+  eigen_decomp <- eigen(cov_matrix)
+  
+  # Vecteurs propres (vecteurs directeurs des composantes principales)
+  eigenvectors <- eigen_decomp$vectors
+  
+  # Valeurs propres (variances = inertie de chaque composante)
+  eigenvalues <- eigen_decomp$values
+  
+  #Calcul des nouvelles coordonnées (scores)
+  # Projection des données sur les axes principaux
+  scores <- X_centered %*% eigenvectors
+  
+  #Calcul des taux d'inertie
+  total_inertia <- sum(eigenvalues)
+  inertia_rates <- eigenvalues / total_inertia * 100
+  cumulative_inertia <- cumsum(inertia_rates)
+
+  results <- list(
+    eigenvalues = eigenvalues,
+    eigenvectors = eigenvectors,
+    scores = scores,
+    inertia_rates = inertia_rates,
+    cumulative_inertia = cumulative_inertia,
+    means = means,
+    cov_matrix = cov_matrix,
+    n = n,
+    p = p
+  )
+  
+  class(results) <- "acp"
+  return(results)
+}
+resultat_acp <- acp(data, center = TRUE)
+
+```
+
+# 4. Résultats de l'ACP
+
+## 4.1 Vecteurs directeurs des composantes principales
+
+```{r eigenvectors}
+
+eigenvectors_df <- as.data.frame(resultat_acp$eigenvectors)
+colnames(eigenvectors_df) <- paste0("CP", 1:resultat_acp$p)
+rownames(eigenvectors_df) <- colnames(data)
+
+print(round(eigenvectors_df, 4))
+
+```
+
+## 4.2 Inertie de chaque composante principale
+
+```{r eigenvalues}
+
+inertia_df <- data.frame(
+  Composante = paste0("CP", 1:resultat_acp$p),
+  Valeur_propre = round(resultat_acp$eigenvalues, 4),
+  Inertie_pct = round(resultat_acp$inertia_rates, 2),
+  Inertie_cumulee = round(resultat_acp$cumulative_inertia, 2)
+)
+
+print(inertia_df)
+
+print(round(eigenvectors_df[, 1:3], 4))
+```
+
+J'ai décidé d'afficher les 3 premiers vecteurs qui représentent presque 80% de l'inertie 
+
+## 4.3 Taux d'inertie cumulés
+
+J'ai trouvé qu'il peut-être bien de garder uniquement les vecteurs propres dont la valeur propre est supérieur à 1. (Critère de Kaiser). 
+
+```{r cumulative_inertia}
+
+par(mfrow = c(1, 2))
+
+# Graphique 1: Valeurs propres
+barplot(resultat_acp$eigenvalues, 
+        names.arg = paste0("CP", 1:resultat_acp$p),
+        main = "Éboulis des valeurs propres",
+        xlab = "Composantes principales",
+        ylab = "Valeurs propres",
+        col = "steelblue",
+        border = "white")
+abline(h = 1, col = "red", lty = 2, lwd = 2)
+legend("topright", legend = "Critère de Kaiser (λ=1)", 
+       col = "red", lty = 2, lwd = 2, bty = "n")
+
+# Graphique 2: Pourcentages d'inertie cumulée
+plot(1:resultat_acp$p, resultat_acp$cumulative_inertia,
+     type = "b", pch = 19, col = "darkgreen",
+     main = "Inertie cumulée",
+     xlab = "Nombre de composantes",
+     ylab = "Pourcentage d'inertie cumulée (%)",
+     ylim = c(0, 100))
+abline(h = c(70, 80, 90), col = c("orange", "red", "purple"), lty = 2)
+grid()
+legend("bottomright", 
+       legend = c("70%", "80%", "90%"), 
+       col = c("orange", "red", "purple"), 
+       lty = 2, bty = "n")
+
+par(mfrow = c(1, 1))
+
+# Détermination du nombre de composantes à retenir
+n_comp_kaiser <- sum(resultat_acp$eigenvalues >= 1)
+n_comp_80 <- which(resultat_acp$cumulative_inertia >= 80)[1]
+
+cat("\n\nCritères de sélection du nombre de composantes:\n")
+cat("- Critère de Kaiser (λ ≥ 1):", n_comp_kaiser, "composantes\n")
+cat("- Critère des 80% d'inertie:", n_comp_80, "composantes\n")
+cat("- Inertie des 2 premières composantes:", 
+    round(resultat_acp$cumulative_inertia[2], 2), "%\n")
+cat("- Inertie des 3 premières composantes:", 
+    round(resultat_acp$cumulative_inertia[3], 2), "%\n")
+```
+
+## 4.4 Nouvelles coordonnées des points (scores)
+
+```{r scores}
+
+scores_df <- as.data.frame(resultat_acp$scores)
+colnames(scores_df) <- paste0("CP", 1:resultat_acp$p)
+
+print(round(head(scores_df, 10), 4))
+
+# Statistiques descriptives des scores
+cat("\n\nStatistiques descriptives des vecteurs propres (3 premières composantes):\n")
+print(summary(scores_df[, 1:min(3, ncol(scores_df))]))
+```
+
+# 5. Visualisations
+
+## 5.1 Plan factoriel (CP1 vs CP2)
+
+```{r factorial_plane}
+# Graphique des individus dans le plan principal
+plot(resultat_acp$scores[,1], resultat_acp$scores[,2],
+     pch = 19, col = rgb(0, 0, 1, 0.5),
+     main = "Plan factoriel CP1-CP2",
+     xlab = paste0("CP1 (", round(resultat_acp$inertia_rates[1], 1), "%)"),
+     ylab = paste0("CP2 (", round(resultat_acp$inertia_rates[2], 1), "%)"),
+     cex = 0.8)
+abline(h = 0, v = 0, col = "gray", lty = 2)
+grid()
+
+# Ajout des labels pour quelques points
+text(resultat_acp$scores[1:min(5, nrow(resultat_acp$scores)),1], 
+     resultat_acp$scores[1:min(5, nrow(resultat_acp$scores)),2],
+     labels = 1:min(5, nrow(resultat_acp$scores)),
+     pos = 3, cex = 0.7, col = "red")
+```
+
+## 5.2 Cercle des corrélations
+
+```{r correlation_circle}
+# Calcul des corrélations entre variables et composantes
+cor_var_comp <- cor(data, resultat_acp$scores)
+
+# Cercle des corrélations pour CP1 et CP2
+plot(cor_var_comp[,1], cor_var_comp[,2],
+     xlim = c(-1, 1), ylim = c(-1, 1),
+     pch = 19, col = "red",
+     main = "Cercle des corrélations (CP1-CP2)",
+     xlab = paste0("CP1 (", round(resultat_acp$inertia_rates[1], 1), "%)"),
+     ylab = paste0("CP2 (", round(resultat_acp$inertia_rates[2], 1), "%)"))
+
+# Ajout du cercle de corrélation
+theta <- seq(0, 2*pi, length = 200)
+lines(cos(theta), sin(theta), col = "gray")
+abline(h = 0, v = 0, col = "gray", lty = 2)
+
+# Ajout des flèches et labels
+arrows(0, 0, cor_var_comp[,1], cor_var_comp[,2], 
+       length = 0.1, col = "blue", lwd = 2)
+text(cor_var_comp[,1], cor_var_comp[,2], 
+     labels = rownames(cor_var_comp),
+     pos = 4, cex = 0.8, col = "darkred")
+```
+
+
+# 6. Interprétation
+
+## 6.1 Qualité de représentation
+
+```{r quality}
+# Calcul de la qualité de représentation (cos²)
+cos2_ind <- resultat_acp$scores^2 / rowSums(resultat_acp$scores^2)
+cos2_var <- cor_var_comp^2
+
+
+quality_df <- data.frame(
+  Variable = rownames(cor_var_comp),
+  cos2_CP1 = round(cos2_var[,1], 3),
+  cos2_CP2 = round(cos2_var[,2], 3),
+  cos2_CP1_CP2 = round(cos2_var[,1] + cos2_var[,2], 3)
+)
+print(quality_df)
+
+print(quality_df[quality_df$cos2_CP1_CP2 > 0.5, ])
+```
+
+## 6.2 Contributions des variables
+
+```{r contributions}
+# Calcul des contributions des variables aux composantes
+contrib_var <- (resultat_acp$eigenvectors^2) * 100 / resultat_acp$p
+
+contrib_df <- as.data.frame(contrib_var)
+colnames(contrib_df) <- paste0("CP", 1:resultat_acp$p)
+rownames(contrib_df) <- colnames(data)
+
+
+print(round(contrib_df[, 1:min(3, ncol(contrib_df))], 2))
+
+# Visualisation des contributions pour CP1 et CP2
+par(mfrow = c(1, 2))
+barplot(contrib_var[,1], names.arg = rownames(contrib_df),
+        main = "Contributions à CP1",
+        ylab = "Contribution (%)",
+        col = "steelblue", las = 2, cex.names = 0.7)
+abline(h = 100/resultat_acp$p, col = "red", lty = 2)
+
+barplot(contrib_var[,2], names.arg = rownames(contrib_df),
+        main = "Contributions à CP2",
+        ylab = "Contribution (%)",
+        col = "coral", las = 2, cex.names = 0.7)
+abline(h = 100/resultat_acp$p, col = "red", lty = 2)
+par(mfrow = c(1, 1))
+```
+Avec seulement 2 vecteurs propre, on ne prends pas bien en compte la variable X2. Le 3ème vecteur propre lui permet de prendre en compte la variable X2. 
+# 7. Résumé et Conclusions
+
+```{r summary}
+cat("========================================\n")
+cat("RÉSUMÉ DE L'ANALYSE EN COMPOSANTES PRINCIPALES\n")
+cat("========================================\n\n")
+
+cat("1. Données:\n")
+cat("   - Nombre d'individus:", resultat_acp$n, "\n")
+cat("   - Nombre de variables:", resultat_acp$p, "\n\n")
+
+cat("2. Composantes principales retenues:\n")
+cat("   - Selon le critère de Kaiser:", n_comp_kaiser, "composantes\n")
+cat("   - Selon le critère des 80%:", n_comp_80, "composantes\n\n")
+
+cat("3. Inertie expliquée:\n")
+cat("   - Par la première composante:", 
+    round(resultat_acp$inertia_rates[1], 2), "%\n")
+cat("   - Par les deux premières composantes:", 
+    round(resultat_acp$cumulative_inertia[2], 2), "%\n")
+cat("   - Par les trois premières composantes:", 
+    round(resultat_acp$cumulative_inertia[3], 2), "%\n\n")
+
+cat("4. Interprétation:\n")
+cat("   - Les", 3, "premières composantes capturent presque 80% de l'information\n")
+cat("   - Le plan factoriel CP1-CP2 explique", 
+    round(resultat_acp$cumulative_inertia[2], 1), 
+    "% de la variabilité totale\n\n")
+
+# Variables les plus importantes pour CP1
+cat("5. Variables principales pour CP1:\n")
+top_cp1 <- order(abs(resultat_acp$eigenvectors[,1]), decreasing = TRUE)[1:3]
+for(i in top_cp1) {
+  cat("   -", colnames(data)[i], ":", 
+      round(resultat_acp$eigenvectors[i,1], 3), "\n")
+}
+
+cat("\n6. Variables principales pour CP2:\n")
+top_cp2 <- order(abs(resultat_acp$eigenvectors[,2]), decreasing = TRUE)[1:3]
+for(i in top_cp2) {
+  cat("   -", colnames(data)[i], ":", 
+      round(resultat_acp$eigenvectors[i,2], 3), "\n")
+}
+
+cat("\n========================================\n")
+```
+Si j'enlève les data aberrantes
+
+
+```{r eigenvectors}
+data<- data[-c(10,11), ]
+data
+resultat_acp<- acp(data, center = TRUE)
+eigenvectors_df <- as.data.frame(resultat_acp$eigenvectors)
+colnames(eigenvectors_df) <- paste0("CP", 1:resultat_acp$p)
+rownames(eigenvectors_df) <- colnames(data)
+
+print(round(eigenvectors_df, 4))
+
+```
+
+
+```{r eigenvalues}
+
+inertia_df <- data.frame(
+  Composante = paste0("CP", 1:resultat_acp$p),
+  Valeur_propre = round(resultat_acp$eigenvalues, 4),
+  Inertie_pct = round(resultat_acp$inertia_rates, 2),
+  Inertie_cumulee = round(resultat_acp$cumulative_inertia, 2)
+)
+
+print(inertia_df)
+
+print(round(eigenvectors_df[, 1:3], 4))
+```
+
+J'ai décidé d'afficher les 3 premiers vecteurs qui représentent cette fois plus de 80% de l'inertie. On passe d'une inertie pour le premier vecteur de 35.91 à 45.55%. 
+
+```{r cumulative_inertia}
+
+par(mfrow = c(1, 2))
+
+# Graphique 1: Valeurs propres
+barplot(resultat_acp$eigenvalues, 
+        names.arg = paste0("CP", 1:resultat_acp$p),
+        main = "Éboulis des valeurs propres",
+        xlab = "Composantes principales",
+        ylab = "Valeurs propres",
+        col = "steelblue",
+        border = "white")
+abline(h = 1, col = "red", lty = 2, lwd = 2)
+legend("topright", legend = "Critère de Kaiser (λ=1)", 
+       col = "red", lty = 2, lwd = 2, bty = "n")
+
+# Graphique 2: Pourcentages d'inertie cumulée
+plot(1:resultat_acp$p, resultat_acp$cumulative_inertia,
+     type = "b", pch = 19, col = "darkgreen",
+     main = "Inertie cumulée",
+     xlab = "Nombre de composantes",
+     ylab = "Pourcentage d'inertie cumulée (%)",
+     ylim = c(0, 100))
+abline(h = c(70, 80, 90), col = c("orange", "red", "purple"), lty = 2)
+grid()
+legend("bottomright", 
+       legend = c("70%", "80%", "90%"), 
+       col = c("orange", "red", "purple"), 
+       lty = 2, bty = "n")
+
+par(mfrow = c(1, 1))
+
+# Détermination du nombre de composantes à retenir
+n_comp_kaiser <- sum(resultat_acp$eigenvalues >= 1)
+n_comp_80 <- which(resultat_acp$cumulative_inertia >= 80)[1]
+
+cat("\n\nCritères de sélection du nombre de composantes:\n")
+cat("- Critère de Kaiser (λ ≥ 1):", n_comp_kaiser, "composantes\n")
+cat("- Critère des 80% d'inertie:", n_comp_80, "composantes\n")
+cat("- Inertie des 2 premières composantes:", 
+    round(resultat_acp$cumulative_inertia[2], 2), "%\n")
+cat("- Inertie des 3 premières composantes:", 
+    round(resultat_acp$cumulative_inertia[3], 2), "%\n")
+```
+Nécessairement en enlevant les valeurs aberrantes on atteint plus vite une inertie cumulée élevée. 
+## 4.4 Nouvelles coordonnées des points (scores)
+
+```{r scores}
+
+scores_df <- as.data.frame(resultat_acp$scores)
+colnames(scores_df) <- paste0("CP", 1:resultat_acp$p)
+
+print(round(head(scores_df, 10), 4))
+
+# Statistiques descriptives des scores
+cat("\n\nStatistiques descriptives des vecteurs propres (3 premières composantes):\n")
+print(summary(scores_df[, 1:min(3, ncol(scores_df))]))
+```
+
+# 5. Visualisations
+
+## 5.1 Plan factoriel (CP1 vs CP2)
+
+```{r factorial_plane}
+# Graphique des individus dans le plan principal
+plot(resultat_acp$scores[,1], resultat_acp$scores[,2],
+     pch = 19, col = rgb(0, 0, 1, 0.5),
+     main = "Plan factoriel CP1-CP2",
+     xlab = paste0("CP1 (", round(resultat_acp$inertia_rates[1], 1), "%)"),
+     ylab = paste0("CP2 (", round(resultat_acp$inertia_rates[2], 1), "%)"),
+     cex = 0.8)
+abline(h = 0, v = 0, col = "gray", lty = 2)
+grid()
+
+# Ajout des labels pour quelques points
+text(resultat_acp$scores[1:min(5, nrow(resultat_acp$scores)),1], 
+     resultat_acp$scores[1:min(5, nrow(resultat_acp$scores)),2],
+     labels = 1:min(5, nrow(resultat_acp$scores)),
+     pos = 3, cex = 0.7, col = "red")
+```
+
+## 5.2 Cercle des corrélations
+
+```{r correlation_circle}
+# Calcul des corrélations entre variables et composantes
+cor_var_comp <- cor(data, resultat_acp$scores)
+
+# Cercle des corrélations pour CP1 et CP2
+plot(cor_var_comp[,1], cor_var_comp[,2],
+     xlim = c(-1, 1), ylim = c(-1, 1),
+     pch = 19, col = "red",
+     main = "Cercle des corrélations (CP1-CP2)",
+     xlab = paste0("CP1 (", round(resultat_acp$inertia_rates[1], 1), "%)"),
+     ylab = paste0("CP2 (", round(resultat_acp$inertia_rates[2], 1), "%)"))
+
+# Ajout du cercle de corrélation
+theta <- seq(0, 2*pi, length = 200)
+lines(cos(theta), sin(theta), col = "gray")
+abline(h = 0, v = 0, col = "gray", lty = 2)
+
+# Ajout des flèches et labels
+arrows(0, 0, cor_var_comp[,1], cor_var_comp[,2], 
+       length = 0.1, col = "blue", lwd = 2)
+text(cor_var_comp[,1], cor_var_comp[,2], 
+     labels = rownames(cor_var_comp),
+     pos = 4, cex = 0.8, col = "darkred")
+```
+La nouvelle représentation des variables dans le plan des 2 principales vectuers propres montre que cette fois X2 est bien représenté et que les variables X7 et X8 sont très fortement corrélé. Ce que l'on ne voyait pas sur la première figure. 
+
+# 6. Interprétation
+
+## 6.1 Qualité de représentation
+
+```{r quality}
+# Calcul de la qualité de représentation (cos²)
+cos2_ind <- resultat_acp$scores^2 / rowSums(resultat_acp$scores^2)
+cos2_var <- cor_var_comp^2
+
+
+quality_df <- data.frame(
+  Variable = rownames(cor_var_comp),
+  cos2_CP1 = round(cos2_var[,1], 3),
+  cos2_CP2 = round(cos2_var[,2], 3),
+  cos2_CP1_CP2 = round(cos2_var[,1] + cos2_var[,2], 3)
+)
+print(quality_df)
+
+print(quality_df[quality_df$cos2_CP1_CP2 > 0.5, ])
+```
+
+## 6.2 Contributions des variables
+
+```{r contributions}
+# Calcul des contributions des variables aux composantes
+contrib_var <- (resultat_acp$eigenvectors^2) * 100 / resultat_acp$p
+
+contrib_df <- as.data.frame(contrib_var)
+colnames(contrib_df) <- paste0("CP", 1:resultat_acp$p)
+rownames(contrib_df) <- colnames(data)
+
+
+print(round(contrib_df[, 1:min(3, ncol(contrib_df))], 2))
+
+# Visualisation des contributions pour CP1 et CP2
+par(mfrow = c(1, 2))
+barplot(contrib_var[,1], names.arg = rownames(contrib_df),
+        main = "Contributions à CP1",
+        ylab = "Contribution (%)",
+        col = "steelblue", las = 2, cex.names = 0.7)
+abline(h = 100/resultat_acp$p, col = "red", lty = 2)
+
+barplot(contrib_var[,2], names.arg = rownames(contrib_df),
+        main = "Contributions à CP2",
+        ylab = "Contribution (%)",
+        col = "coral", las = 2, cex.names = 0.7)
+abline(h = 100/resultat_acp$p, col = "red", lty = 2)
+par(mfrow = c(1, 1))
+```
+Désormais on prend mieux en compte X8. 
+# 7. Résumé et Conclusions
+
+```{r summary}
+cat("========================================\n")
+cat("RÉSUMÉ DE L'ANALYSE EN COMPOSANTES PRINCIPALES\n")
+cat("========================================\n\n")
+
+cat("1. Données:\n")
+cat("   - Nombre d'individus:", resultat_acp$n, "\n")
+cat("   - Nombre de variables:", resultat_acp$p, "\n\n")
+
+cat("2. Composantes principales retenues:\n")
+cat("   - Selon le critère de Kaiser:", n_comp_kaiser, "composantes\n")
+cat("   - Selon le critère des 80%:", n_comp_80, "composantes\n\n")
+
+cat("3. Inertie expliquée:\n")
+cat("   - Par la première composante:", 
+    round(resultat_acp$inertia_rates[1], 2), "%\n")
+cat("   - Par les deux premières composantes:", 
+    round(resultat_acp$cumulative_inertia[2], 2), "%\n")
+cat("   - Par les trois premières composantes:", 
+    round(resultat_acp$cumulative_inertia[3], 2), "%\n\n")
+
+cat("4. Interprétation:\n")
+cat("   - Les", 3, "premières composantes capturent presque 80% de l'information\n")
+cat("   - Le plan factoriel CP1-CP2 explique", 
+    round(resultat_acp$cumulative_inertia[2], 1), 
+    "% de la variabilité totale\n\n")
+
+# Variables les plus importantes pour CP1
+cat("5. Variables principales pour CP1:\n")
+top_cp1 <- order(abs(resultat_acp$eigenvectors[,1]), decreasing = TRUE)[1:3]
+for(i in top_cp1) {
+  cat("   -", colnames(data)[i], ":", 
+      round(resultat_acp$eigenvectors[i,1], 3), "\n")
+}
+
+cat("\n6. Variables principales pour CP2:\n")
+top_cp2 <- order(abs(resultat_acp$eigenvectors[,2]), decreasing = TRUE)[1:3]
+for(i in top_cp2) {
+  cat("   -", colnames(data)[i], ":", 
+      round(resultat_acp$eigenvectors[i,2], 3), "\n")
+}
+
+cat("\n========================================\n")
+```
+L'ACP permet de condenser l'information d'un dataset et permet donc de réduire les dimensions du dataset, ce qui contribue à réduire les risques d'overfitting. Il faut faire attention à ne pas inclure de données aberrantes. En trouvant, les outliers avant d'opérer l'algorithme ACP comme on a pu le voir à la seconde itération où les 2 observations aberrantes ont été supprimer du dataset, cela a permis d'obtenir une inertie cumulée plus grande plus rapidement. 88.6% avec 3 vecteurs contre 79% au départ.   
