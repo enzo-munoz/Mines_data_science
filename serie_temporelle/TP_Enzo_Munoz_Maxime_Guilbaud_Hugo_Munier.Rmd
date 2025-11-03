@@ -1,0 +1,1399 @@
+---
+title: "TP Série Temporelle"
+author: "Enzo Munoz - Hugo Munier - Maxime Guilbaud"
+date: "2025-10-12"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(
+  fig.width = 7,        
+  fig.height = 4.5,
+  out.width = "90%",    
+  fig.align = "center", 
+  fig.pos = "H"       
+)
+knitr::opts_chunk$set(
+  message = FALSE,   
+  warning = FALSE    
+)
+```
+
+## Contexte du TP
+
+
+```{r, echo=FALSE}
+library (tseries)
+library(FinTS)
+library(rugarch)
+library(Metrics)
+library(forecast)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(forecast)
+library(tseries)
+library(ggplot2)
+library(gridExtra)
+library(moments)
+library(psych)
+
+
+```
+
+```{r, echo = FALSE}
+
+data <- read.csv("data.csv", stringsAsFactors = FALSE)
+
+#head(data)
+#str(data)
+data$temp_C <- (data$TAVG..Degrees.Fahrenheit. - 32)/1.8
+
+#head(data[,c("TAVG..Degrees.Fahrenheit.","temp_C")])
+
+data$Date <- as.Date(data$Date, format="%m/%d/%Y") #Convertir la colonne en objet Date
+
+data_mensuelle <- data %>%
+  mutate (mois = floor_date(Date, "month")) %>%
+  group_by(mois) %>%
+  summarise(T_moy = mean(temp_C, na.rm = TRUE))
+
+head(data_mensuelle)
+
+```
+Les données journalières de température à Lyon entre 1990 et 2025 ont été importées avec succès et converties de °F en °C.
+Elles ont ensuite été agrégées en moyennes mensuelles, donnant une série temporelle de fréquence 12.
+La série montre une saisonnalité annuelle très nette, avec des pics estivaux (≈ juillet–août) et des creux hivernaux (≈ janvier).
+L’amplitude des variations saisonnières est d’environ 20°C, stable au fil des années.
+
+```{r, echo = FALSE}
+
+temperature <- (ts(data_mensuelle$T_moy, start = c(1990,1), frequency = 12))
+len<- length(temperature)
+moyenne <- mean(temperature, na.rm = TRUE)
+mediane <- median(temperature, na.rm = TRUE)
+variance <- var(temperature, , na.rm = TRUE)
+asymetrie <- skewness(temperature, na.rm = TRUE)
+aplatissement <- kurtosis(temperature, na.rm = TRUE)
+
+```
+Le nombre totale de mois observé est 427 entre Janvier 1990 et Juillet 2025. 
+```{r, echo = FALSE}
+stats_df <- data.frame(
+  Statistique = c("Moyenne", "Médiane", "Variance", "Skewness (asymétrie)", "Kurtosis (aplatissement)"),
+  Valeur = c(moyenne, mediane, variance, asymetrie, aplatissement)
+)
+
+knitr::kable(
+  stats_df,
+  caption = "Statistiques descriptives de la série temporelle",
+  digits = 3
+)
+```
+
+
+```{r, echo = FALSE}
+plot(temperature,
+     main = " Température moyenne mensuelle à Lyon",
+     xlab = "Année",
+     ylab = "Température (°C)",
+     col = "blue",
+     lwd = 2)
+grid()
+mu<- mean(temperature)
+
+abline(h = mu, col = "red", lty = 2, lwd = 2)
+legend("topleft", legend = "Moyenne", col = "red", lty = 2, lwd = 2, bty = "n")
+
+```
+
+La série temporelle présente une moyenne d’environ 13,2°C et une médiane proche (12,6°C), ce qui suggère une distribution globalement symétrique. 
+La variance (47,2) indique une dispersion modérée des valeurs autour de la moyenne, avec un écart-type d’environ 7°C. 
+Le skewness proche de zéro (0,04) confirme l’absence d’asymétrie marquée, tandis que le kurtosis inférieur à 3 (1,79) traduit une distribution plus aplatie que la normale, avec moins de valeurs extrêmes.
+
+La série présente une forte saisonnalité annuelle (été chaud, hiver froid), avec une amplitude assez stable (~20°C). 
+On peut suspecter une tendance légèrement haussière des températures maximales récentes, mais ce n’est pas flagrant visuellement. 
+
+```{r, echo=FALSE}
+# Extraire les mois (1 à 12)
+months <- cycle(temperature)
+
+df <- data.frame(Month = factor(months, levels = 1:12, labels = month.abb),
+                 Temp = as.numeric(temperature))
+
+# Tracer les boxplots par mois
+ggplot(df, aes(x = Month, y = Temp)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Distribution des températures par mois",
+       x = "Mois",
+       y = "Température (°C)") +
+  theme_minimal()
+
+ecart_type_par_mois <- df %>%
+  group_by(Month) %>%
+  summarise(Ecart_Type_Temp = sd(Temp))
+
+# Création du graphique
+ggplot(data = ecart_type_par_mois, aes(x = Month, y = Ecart_Type_Temp)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Écart type mensuel des températures",
+    x = "Mois",
+    y = "Écart type des températures"
+  ) +
+  theme_minimal()
+
+```
+La volatilité dépend du mois étudié. Sur le graphe on voit l'hétéroscélasticité des températures, notament un écart type plus important pour le mois de Janvier avec un écart type de 1.876471°C ou Février avec 2.472963°c contre un écart type de température plus faible pour les mois de Mars ou Avril (1.350898°C resp. 1.497665°C) par exemple.
+
+```{r, echo=FALSE}
+# Différenciation simple
+ts_diff1 <- diff(temperature, differences = 1)
+
+# Différenciation saisonnière
+ts_diff_seas <- diff(temperature, lag = 12)
+
+# Tests sur séries différenciées
+par(mfrow = c(2, 2))
+plot(temperature, main = "Série Originale", ylab = "Température", col = "blue", lwd = 1.5)
+plot(ts_diff1, main = "Différenciation d = 1", ylab = "Diff(Température)", col = "red", lwd = 1.5)
+abline(h = 0, lty = 2)
+plot(ts_diff_seas, main = "Différenciation Saisonnière (lag=12)", 
+     ylab = "Diff(Température)", col = "green4", lwd = 1.5)
+abline(h = 0, lty = 2)
+
+# ACF de la série différenciée
+acf(ts_diff1, main = "ACF - Série Différenciée (d=1)", lag.max = 36)
+
+# Test ADF sur série différenciée
+adf_diff <- adf.test(ts_diff1)
+cat("\nTest ADF après différenciation (d=1) :\n")
+cat("p-value :", round(adf_diff$p.value, 4), "\n")
+```
+Afin d'analyser la stationnarité de la série, nous avons effectué un test de Dickey-Fuller augmenté sur la série préalablement différenciée à l'ordre 1. L'obtention d'une p-value de 0.01 nous permet de rejeter l'hypothèse de non stationnarité. L'examen de sa fonction d'autocorrélation (ACF) a cependant mis en évidence des pics périodiques significatifs, suggérant une composante saisonnière. Pour la suite de l'analyse, nous avons donc décidé de travailler avec la série corrigée de ses variations saisonnières avec un décalage de 12 périodes.
+
+```{r, echo=FALSE}
+des_data<- diff(temperature, lag=12)
+plot(des_data, type='o', main = "Série désaisonnalisée par différenciation (lag 12)")
+mu <- mean(des_data)
+sig.des_data <- sd(des_data)
+abline(h=mu, col="red", lwd=2)
+abline(h=mu+2*sig.des_data, col="red", lwd=2,lty=2)
+abline(h=mu-2*sig.des_data, col="red", lwd=2,lty=2)
+grid()
+
+```
+Une première inspection visuelle de la série temporelle des températures ne révèle pas de tendance (trend) évidente. Afin de mieux comprendre la structure de dépendance temporelle et d'identifier la présence éventuelle de processus auto-régressifs (AR) ou de moyenne mobile (MA), nous allons maintenant procéder à l'analyse de ses fonctions d'autocorrélation (ACF) et d'autocorrélation partielle (PACF).
+
+#II. Modélisation et analyse
+
+Maintenant que la série a été rendue stationnaire, cette deuxième partie est consacrée à la modélisation de sa dynamique temporelle. L'objectif est d'identifier, d'ajuster et de valider le modèle de type AR ou ARMA le plus pertinent pour décrire la structure de dépendance des données.
+```{r, echo=FALSE}
+par(mfrow = c(2,1))
+
+acf(des_data, lag.max = 36, xaxt = "n", main = "ACF")
+axis(1, at = 0:36/12, labels = 0:36)
+pacf(des_data, lag.max = 36, xaxt = "n", main = "PACF")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+L'analyse des corrélogrammes ACF et PACF révèle une structure de dépendance temporelle marquée par une forte saisonnalité. La fonction d'autocorrélation (ACF) présente un pic significatif au retard 12, avant de "couper" tandis que la fonction d'autocorrélation partielle (PACF) affiche un pic négatif particulièrement important à -0.5 pour le retard 12, et des pics au lag 24 et 36 sont moins proéminent, semble amorcer une décroissance lente et significative. Ce comportement, où l'autocorrélation parcielle saisonnière ne s'annule pas nettement mais diminue progressivement, suggère que le modèle pourrait bénéficier de l'ajout d'une composante de moyenne mobile saisonnière (SMA). Un modèle SARIMA, intégrant à la fois des termes SAR et SMA, pourrait donc être plus pertinent pour capturer l'ensemble de la dynamique saisonnière de la série.
+
+
+
+
+Deux tests statistiques ont été appliqués à la série désaisonnalisée :
+Test ADF (Augmented Dickey-Fuller) :
+
+
+Statistique = -6.02
+
+
+p-value = 0.01
+ → On rejette l’hypothèse de non-stationnarité, la série est donc stationnaire.
+
+
+Test KPSS (Kwiatkowski-Phillips-Schmidt-Shin) :
+
+
+Statistique = 0.0148
+
+
+p-value = 0.1
+ → On ne rejette pas l’hypothèse de stationnarité.
+Les deux tests aboutissent à la même conclusion : la série des_data est stationnaire après différenciation annuelle.
+Cela confirme que la tendance et la saisonnalité ont été correctement supprimées, et que la série est maintenant prête pour la modélisation ARIMA.
+```{r}
+
+
+resultats <- data.frame(type = character(),
+                       odre = integer(),
+                       AIC = numeric(),
+                       BIC = numeric())
+
+for (p in 1:5){
+  fit <- tryCatch({
+    arima(des_data, order = c(p,0,0), method="ML")
+  }, error=function(e) NULL)
+  
+  if(!is.null(fit)){
+    resultats <- rbind(resultats, data.frame(
+      type = "AR",
+      ordre = p,
+      AIC = AIC(fit),
+      BIC = BIC(fit)
+    ))
+  }
+}
+
+for (q in 1:5){
+  fit <- tryCatch({
+    arima(des_data, order = c(0,0,q), method="ML")
+  }, error=function(e) NULL)
+  
+  if(!is.null(fit)){
+    resultats <- rbind(resultats, data.frame(
+      type = "MA",
+      ordre = q,
+      AIC = AIC(fit),
+      BIC = BIC(fit)
+    ))
+  }
+}
+
+
+meilleur_AIC <- resultats[which.min(resultats$AIC),]
+meilleur_BIC <- resultats[which.min(resultats$BIC),]
+
+meilleur_AIC_AR <- resultats[resultats$type == "AR", ][which.min(resultats[resultats$type == "AR", ]$AIC), ]
+meilleur_BIC_AR <- resultats[resultats$type == "AR", ][which.min(resultats[resultats$type == "AR", ]$BIC), ]
+
+meilleur_AIC_MA <- resultats[resultats$type == "MA", ][which.min(resultats[resultats$type == "MA", ]$AIC), ]
+meilleur_BIC_MA <- resultats[resultats$type == "MA", ][which.min(resultats[resultats$type == "MA", ]$BIC), ]
+
+cat("Meilleur modèle selon AIC:", meilleur_AIC$type, "(",meilleur_AIC$ordre, ")\n",
+    "Meilleur modèle selon BIC:", meilleur_BIC$type, "(",meilleur_BIC$ordre, ")\n", 
+    "Meilleur modèle AR selon AIC:", meilleur_AIC_AR$type, "(",meilleur_AIC_AR$ordre, ")\n",
+    "Meilleur modèle AR selon BIC:", meilleur_BIC_AR$type, "(",meilleur_BIC_AR$ordre, ")\n",
+    "Meilleur modèle MA selon AIC:", meilleur_AIC_MA$type, "(",meilleur_AIC_MA$ordre, ")\n",
+    "Meilleur modèle MA selon BIC:", meilleur_BIC_MA$type, "(",meilleur_BIC_MA$ordre, ")\n"
+    )
+
+```
+Effectivement, les modèles avec plus de paramètres ont un meilleur AIC mais c'est dû à un "sur-apprentissage" qui est mis en évidence par la mesure du BIC qui met les modèles AR(1) et MA(1) en avant. On comprend bien intuitivement que la température moyenne pour le mois de juin par exemple dépend peu de la température de la même année en Janvier. 
+
+```{r, warning=FALSE}
+
+resultats_ARMA <- data.frame(
+  p = integer(),
+  q = integer(),
+  AIC = numeric(),
+  BIC = numeric()
+)
+
+for (p in 0:5){
+  for (q in 0:5){
+    if (p==0 & q==0) next
+    
+    fit <- tryCatch({
+      arima(des_data, order = c(p,0,q), method="ML")
+    }, error = function(e) NULL)
+    
+    if (!is.null(fit)){
+      resultats_ARMA <- rbind(resultats_ARMA, data.frame(
+        p = p,
+        q = q,
+        AIC = AIC(fit),
+        BIC = BIC(fit)
+      ))
+    }
+  }
+}
+
+
+meilleur_AIC_ARMA <- resultats_ARMA[which.min(resultats_ARMA$AIC),]
+meilleur_BIC_ARMA <- resultats_ARMA[which.min(resultats_ARMA$BIC),]
+
+cat("\nMeilleur modèle ARMA selon AIC: ARMA(",meilleur_AIC_ARMA$p, "0",meilleur_AIC_ARMA$q, ")\n","Meilleur modèle ARMA selon BIC: ARMA(",meilleur_BIC_ARMA$p, "0",meilleur_BIC_ARMA$q, ")") 
+
+resultats_ARMA$p <- as.factor(resultats_ARMA$p)
+resultats_ARMA$q <- as.factor(resultats_ARMA$q)
+
+heatmap_plot <- ggplot(resultats_ARMA, aes(x = q, y = p, fill = BIC)) +
+  geom_tile(color = "white", lwd = 0.5) + 
+  geom_text(aes(label = round(BIC, 1)), color = "black", size = 3.5) +
+  scale_fill_viridis_c(direction = -1) + 
+  labs(
+    title = "Heatmap du BIC pour différents modèles ARMA(p,q)",
+    x = "Ordre 'q' (Moyenne Mobile)",
+    y = "Ordre 'p' (Autorégressif)",
+    fill = "BIC"
+  ) +
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    axis.title = element_text(size = 12)
+  )
+
+
+```
+Analyse des résidus :
+Pour le modèle AR(4) :
+
+
+L’ACF des résidus montre encore des pics significatifs → autocorrélations résiduelles non négligeables.
+
+
+Le test de Ljung–Box (p-value < 0.001) confirme la présence d’autocorrélation → modèle insuffisant.
+
+
+Pour le modèle ARMA(5,5) :
+
+
+L’ACF des résidus est plus aléatoire, avec des valeurs globalement dans les bandes de confiance.
+
+
+Le test de Ljung–Box (p-value = 6.38×10⁻¹³) reste significatif, mais indique une amélioration par rapport au modèle AR pur.
+
+
+L’histogramme des résidus est centré sur 0, proche d’une distribution normale.
+
+Conclusion :
+ Le modèle ARMA(5,5) améliore nettement l’ajustement par rapport au modèle AR(4), mais c’est le modèle saisonnier ARMA(12,12) restreint qui fournit les résidus les plus satisfaisants (non autocorrélés et à moyenne nulle).
+ Il constitue donc le meilleur modèle pour la série désaisonnalisée.
+```{r}
+# Afficher le graphique
+print(heatmap_plot)
+
+```
+
+Malgré le fait que le BIC pénalise plus un grand nombre d'estimateur, pour la mesure de performance du modèle, on a quand même un meilleur BIC pour le modèle ARMA(5,5), comme on le voit sur le graphe de HeatMap du BIC en fonction des paramètres p et q.
+
+
+Le test est validé pour ce modèle. 
+
+Dans une première approche de modélisation, nous nous tournons vers les structures les plus parcimonieuses : les modèles de moyenne mobile d'ordre 1, MA(1), et autorégressif d'ordre 1, AR(1). L'objectif est d'évaluer si une dépendance temporelle simple peut expliquer la dynamique de la série. 
+
+```{r}
+modele_AR_1 <- arima(des_data, order = c(1,0,0), method="ML")
+modele_MA_1 <- arima(des_data, order = c(0,0,1), method="ML")
+AIC_AR_1 = AIC(modele_AR_1)
+AIC_MA_1 = AIC(modele_MA_1)
+
+res_AR_1 <- residuals(modele_AR_1)
+res_MA_1 <- residuals(modele_MA_1)
+```
+
+```{r}
+par(mfrow = c(2,1))
+
+acf(res_AR_1, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(1)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_MA_1, lag.max = 36, xaxt = "n", main = "ACF des résidus MA(1)")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+
+```{r}
+Box.test(res_AR_1, lag=12, type="Ljung-Box")
+Box.test(res_MA_1, lag=12, type="Ljung-Box")
+```
+Cependant, l'analyse des résidus de ces deux modèles montre rapidement leurs limites : ils s'avèrent insuffisants pour capturer toute la structure de dépendance, laissant persister une autocorrélation significative qui invalide leur pertinence.
+
+```{r}
+modele_AR <- arima(des_data, order = c(4,0,0), method="ML")
+modele_ARMA <- arima(des_data, order = c(5,0,5), method="ML")
+AIC_ARMA = AIC(modele_ARMA)
+AIC_AR = AIC(modele_AR)
+
+res_AR <- residuals(modele_AR)
+res_ARMA <- residuals(modele_ARMA)
+```
+
+
+```{r}
+par(mfrow = c(2,1))
+
+acf(res_AR, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(4)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(res_ARMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(5,0,5)")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+les deux corrélogrammes affichent un pic de corrélation négatif et statistiquement significatif au douzième retard (lag 12), avec des valeurs respectives de -0.4 et -0.5. Ce pic au lag 12 est un signal clair que les résidus ne se comportent pas comme un bruit blanc, mais conservent une information temporelle prédictible.
+```{r}
+Box.test(res_AR, lag=12, type="Ljung-Box")
+Box.test(res_ARMA, lag=12, type="Ljung-Box")
+```
+L'application du test de Ljung-Box sur les séries de résidus est sans appel : elle retourne des p-valeurs numériquement nulles ("zéro machine"). Ce résultat apporte une preuve statistique irréfutable pour rejeter l'hypothèse nulle d'indépendance des résidus. Il est donc formellement démontré qu'ils ne peuvent être considérés comme un bruit blanc, ce que l'inspection visuelle de leur ACF laissait déjà fortement présager.
+
+```{r}
+hist(res_AR, main = "Histogramme des résidus AR(4)", xlab = "Résidus")
+hist(res_ARMA, main = "Histogramme des résidus ARMA(5,0,5)", xlab = "Résidus")
+
+```
+De surcroît, l'histogramme des résidus s'écarte visiblement d'une distribution normale, violant ainsi une autre hypothèse centrale du modèle. Face à des résidus qui sont à la fois autocorrélés et non-normalement distribués, nous devons conclure que les modèles ajustés sont mal spécifiés et incapables de capturer la structure sous-jacente des données.
+
+
+On passe à des modèles qui prennent en compte la saisonnalité dans les données (le mois de l'année précédente...)
+les trois modèles suivants : AR(12) (subset{lags: 1, 12},, AR(36) (subset{lags: 1, 11, 12, 24, 36}, ARMA(12,0,12) (subset {AR:1,12 ; MA:12). 
+```{r}
+fixed_ar_36 <- c(NA, rep(0,10), NA, NA, rep(0,11),NA, rep(0,11), NA)  
+modele_subsetAR_36 <- Arima(des_data, order=c(37,0,0), include.mean=FALSE, fixed=fixed_ar_36)
+nb_param_AR_36<- coef(modele_subsetAR_36)
+
+
+fixed_ar_12 <- c(NA, rep(0,10), NA)  # φ1 et φ12 libres
+modele_subsetAR_12 <- Arima(des_data, order=c(12,0,0), include.mean=FALSE, fixed=fixed_ar_12)
+nb_param_AR_12<- coef(modele_subsetAR_12)
+
+fixed_arma <- c(NA, rep(0,10), NA,      # AR part : φ1 et φ12 libres
+                rep(0,11), NA)          # MA part : θ12 libre
+modele_subsetARMA <- Arima(des_data, order=c(12,0,12), include.mean=FALSE, fixed=fixed_arma)
+
+res_subsetAR_12 <- residuals(modele_subsetAR_12)
+res_subsetAR_36 <- residuals(modele_subsetAR_36)
+res_subsetARMA <- residuals(modele_subsetARMA)
+
+acf(res_subsetAR_12, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(12) (subset{lags: 1, 12}")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+L'analyse de la fonction d'autocorrélation (ACF) des résidus du modèle AR(12) montre la persistance de pics significatifs aux retards saisonniers 12 et 24.
+```{r}
+acf(res_subsetAR_36, lag.max = 36, xaxt = "n", main = "ACF des résidus AR(36) (subset{lags: 1, 11, 12, 24, 36}")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+L'analyse de la fonction d'autocorrélation (ACF) des résidus du modèle AR(36) subset{1,11,12,24,36} montre la persistance de pics significatifs aux retards saisonniers 10, 13 et 24 et 26.
+
+```{r}
+acf(res_subsetARMA, lag.max = 36, xaxt = "n", main = "ACF des résidus ARMA(12,0,12) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+```
+L'analyse de la fonction d'autocorrélation (ACF) des résidus du modèle ARMA(12) subset {1,12; 12} montre la persistance d'un pic significatif au retard 12.
+
+
+
+## Test de Ljung–Box
+
+Pour valider formellement si les résidus de notre modèle se comportent comme un bruit blanc, nous utilisons le test de Ljung-Box. Ce test statistique permet de déterminer si un ensemble d'autocorrélations d'une série temporelle est globalement non nul.
+
+L'hypothèse nulle (H0) du test est qu'il n'y a pas d'autocorrélation dans les résidus jusqu'au retard m. La statistique du test, notée Q, est calculée comme suit :
+
+$$
+Q = n (n + 2) \sum_{k=1}^{m} \frac{\hat{\rho}(k)^2}{n - k}
+$$
+
+où :
+
+n est le nombre d'observations.
+
+m est le nombre de retards (lags) testés.
+
+ρ(k) est l'autocorrélation empirique des résidus au retard k.
+
+Sous l'hypothèse nulle, la statistique Q suit une loi du Khi-deux. Un point crucial est l'ajustement de ses degrés de liberté : ils sont égaux à m−fitdf, où fitdf représente le nombre de paramètres estimés dans le modèle (par exemple, les coefficients AR et MA). Cet ajustement est nécessaire car l'estimation des paramètres du modèle contraint les résidus et réduit leur variabilité.
+
+Pour un niveau de confiance de 95%, la règle de décision est la suivante : si la p-value calculée est inférieure à 0.05, nous rejetons l'hypothèse nulle et concluons que les résidus sont significativement autocorrélés. Si la p-value est supérieure à 0.05, nous ne pouvons pas rejeter H0 et nous considérons que les résidus sont bien indépendants.
+```{r, echo=FALSE}
+fixed_ar_36 <- c(NA, rep(0,10), NA, NA, rep(0,11),NA, rep(0,11), NA)  
+modele_subsetAR_36 <- Arima(des_data, order=c(37,0,0), include.mean=FALSE, fixed=fixed_ar_36)
+
+fixed_ar_12 <- c(NA, rep(0,10), NA)
+modele_subsetAR_12 <- Arima(des_data, order=c(12,0,0), include.mean=FALSE, fixed=fixed_ar_12)
+
+
+fixed_arma <- c(NA, rep(0,10), NA,      # AR part : φ1 et φ12 libres
+                rep(0,11), NA)          # MA part : θ12 libre
+modele_subsetARMA <- Arima(des_data, order=c(12,0,12), include.mean=FALSE, fixed=fixed_arma)
+```
+
+
+```{r, echo=FALSE}
+# Calcul des résidus
+res_subsetAR_12 <- residuals(modele_subsetAR_12)
+res_subsetAR_36 <- residuals(modele_subsetAR_36)
+res_subsetARMA <- residuals(modele_subsetARMA)
+```
+
+
+```{r, echo=FALSE}
+# Tests de Ljung-Box
+lb_AR12_lag12 <- Box.test(res_subsetAR_12, lag=12, type="Ljung-Box", fitdf = 2)
+lb_AR12_lag24 <- Box.test(res_subsetAR_12, lag=24, type="Ljung-Box", fitdf = 2)
+
+lb_AR36_lag12 <- Box.test(res_subsetAR_36, lag=12, type="Ljung-Box", fitdf = 5)
+lb_AR36_lag24 <- Box.test(res_subsetAR_36, lag=24, type="Ljung-Box", fitdf = 5)
+lb_AR36_lag36 <- Box.test(res_subsetAR_36, lag=36, type="Ljung-Box", fitdf = 5)
+
+lb_ARMA_lag12 <- Box.test(res_subsetARMA, lag=12, type="Ljung-Box", fitdf = 3)
+lb_ARMA_lag24 <- Box.test(res_subsetARMA, lag=24, type="Ljung-Box", fitdf = 3)
+
+```
+
+
+```{r, echo=FALSE}
+# Graphiques des lois du Chi² séparés par ddl
+par(mfrow = c(3,2), mar = c(4, 4, 3, 2))
+
+x <- seq(0, 50, length.out = 500)
+
+# 1. Chi² avec ddl = 10 (AR12, lag=12)
+plot(x, dchisq(x, df = 10), type = "l", lwd = 2, col = "blue",
+     main = expression(paste(chi^2, "(ddl=10) - AR(12) lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR12_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(10)", 
+                  paste0("Q observé = ", round(lb_AR12_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR12_lag12$p.value, 4))),
+       col = c("blue", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 2. Chi² avec ddl = 22 (AR12, lag=24)
+plot(x, dchisq(x, df = 22), type = "l", lwd = 2, col = "blue",
+     main = expression(paste(chi^2, "(ddl=22) - AR(12) lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR12_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(22)", 
+                  paste0("Q observé = ", round(lb_AR12_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR12_lag24$p.value, 4))),
+       col = c("blue", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 3. Chi² avec ddl = 7 (AR36, lag=12)
+plot(x, dchisq(x, df = 7), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=7) - AR(37) lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(7)", 
+                  paste0("Q observé = ", round(lb_AR36_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag12$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 4. Chi² avec ddl = 19 (AR36, lag=24)
+plot(x, dchisq(x, df = 19), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=19) - AR(37) lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(19)", 
+                  paste0("Q observé = ", round(lb_AR36_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag24$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 5. Chi² avec ddl = 31 (AR36, lag=36)
+plot(x, dchisq(x, df = 31), type = "l", lwd = 2, col = "darkgreen",
+     main = expression(paste(chi^2, "(ddl=31) - AR(37) lag=36")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_AR36_lag36$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(31)", 
+                  paste0("Q observé = ", round(lb_AR36_lag36$statistic, 2)),
+                  paste0("p-value = ", round(lb_AR36_lag36$p.value, 4))),
+       col = c("darkgreen", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+
+# 6. Chi² avec ddl = 9 (ARMA, lag=12)
+plot(x, dchisq(x, df = 9), type = "l", lwd = 2, col = "purple",
+     main = expression(paste(chi^2, "(ddl=9) - ARMA lag=12")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_ARMA_lag12$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(9)", 
+                  paste0("Q observé = ", round(lb_ARMA_lag12$statistic, 2)),
+                  paste0("p-value = ", round(lb_ARMA_lag12$p.value, 4))),
+       col = c("purple", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+```
+Parmi l'ensemble des modèles évalués, seul le modèle ARMA(12){1,12; 12} satisfait aux critères du test de Ljung-Box qu'il y ait eu fitdf rajouté en dans le test de Box Ljung ou non, indiquant une absence d'autocorrélation significative dans ses résidus.
+
+```{r, echo=FALSE}
+# Graphique pour ARMA lag=24
+par(mfrow = c(1,1), mar = c(4, 4, 3, 2))
+plot(x, dchisq(x, df = 21), type = "l", lwd = 2, col = "purple",
+     main = expression(paste(chi^2, "(ddl=21) - ARMA lag=24")),
+     ylab = "Densité", xlab = "x")
+abline(v = lb_ARMA_lag24$statistic, col = "red", lty = 2, lwd = 2)
+legend("topright", 
+       legend = c("χ²(21)", 
+                  paste0("Q observé = ", round(lb_ARMA_lag24$statistic, 2)),
+                  paste0("p-value = ", round(lb_ARMA_lag24$p.value, 4))),
+       col = c("purple", "red", NA), lwd = c(2, 2, NA), lty = c(1, 2, NA),
+       cex = 0.8, bty = "n")
+```
+Afin d’approfondir l’analyse, nous avons choisi d’examiner le modèle proposé par la fonction auto.arima.
+```{r}
+fit_auto <- auto.arima(des_data,
+                       seasonal = TRUE,
+                       stepwise = FALSE,
+                       approximation = FALSE,
+                       trace = FALSE,
+                       ic = "aicc")
+
+cat("\n========================================\n")
+cat("MEILLEUR MODÈLE SÉLECTIONNÉ\n")
+cat("========================================\n")
+print(summary(fit_auto))
+
+# Tester plusieurs modèles manuellement
+models <- list(
+  "ARIMA(1,1,1)(1,1,1)[12]" = Arima(des_data, order = c(1,0,1), seasonal = c(1,1,1)),
+  "ARIMA(2,1,2)(1,1,1)[12]" = Arima(des_data, order = c(2,0,2), seasonal = c(1,1,1)),
+  "ARIMA(1,1,2)(2,1,1)[12]" = Arima(des_data, order = c(1,0,2), seasonal = c(2,1,1)),
+  "ARIMA(2,0,2)(2,0,0)[12]" = Arima(des_data, order = c(2,0,2), seasonal = c(2,0,0))
+)
+
+# Comparaison des critères
+comparison <- data.frame(
+  Modèle = names(models),
+  AIC = sapply(models, AIC),
+  BIC = sapply(models, BIC),
+  AICc = sapply(models, function(m) m$aicc),
+  LogLik = sapply(models, logLik)
+)
+
+comparison <- rbind(
+  data.frame(
+    Modèle = "Auto ARIMA",
+    AIC = AIC(fit_auto),
+    BIC = BIC(fit_auto),
+    AICc = fit_auto$aicc,
+    LogLik = logLik(fit_auto)
+  ),
+  comparison
+)
+
+
+comparison <- comparison %>% arrange(AICc)
+
+knitr::kable(comparison, 
+             caption = "Comparaison des Modèles ARIMA",
+             digits = 2)
+
+cat("\n✓ Le meilleur modèle selon AICc est :", comparison$Modèle[1], "\n")
+```
+
+```{r}
+checkresiduals(fit_auto)
+
+residus <- residuals(fit_auto)
+ljung_box <- Box.test(residus, lag = 12, type = "Ljung-Box", fitdf = 5)
+cat("Test de Ljung-Box (H0 : pas d'autocorrélation) :\n")
+cat("  p-value =", round(ljung_box$p.value, 4), "\n")
+if (ljung_box$p.value > 0.05) {
+  cat("  ✓ Les résidus sont un bruit blanc (p > 0.05)\n\n")
+} else {
+  cat("  ✗ Autocorrélation résiduelle détectée (p < 0.05)\n\n")
+}
+
+# Test de Shapiro-Wilk (normalité)
+shapiro_test <- shapiro.test(residus)
+cat("Test de Shapiro-Wilk (H0 : normalité) :\n")
+cat("  p-value =", round(shapiro_test$p.value, 4), "\n")
+if (shapiro_test$p.value > 0.05) {
+  cat("  ✓ Les résidus suivent une loi normale (p > 0.05)\n\n")
+} else {
+  cat("  ✗ Les résidus ne suivent pas une loi normale (p < 0.05)\n\n")
+}
+```
+Les modèles qui ont passé la test de Box-Ljung sont les modèles ARIMA(1,0,1)(2,0,1)[12], ARMA(12,0,12) subset {AR:1,12 ; MA:12} équivalent à ARIMA(1,0,0)(1,0,1)[12]
+
+3. Analyse des résidus
+```{r}
+# Analyse détaillée des résidus
+par(mfrow = c(2, 3))
+
+# 1. Résidus dans le temps
+plot(residus, main = "Résidus du Modèle", ylab = "Résidus", col = "steelblue", type = "l")
+abline(h = 0, col = "red", lty = 2, lwd = 2)
+
+acf(residus, lag.max = 36, xaxt = "n", main = "ACF des résidus auto.arima")
+axis(1, at = 0:36/12, labels = 0:36)
+pacf(residus, lag.max = 36, xaxt = "n", main = "ACF des résidus auto.arima")
+axis(1, at = 0:36/12, labels = 0:36)
+
+# 4. Histogramme
+hist(residus, breaks = 30, main = "Distribution des Résidus",
+     xlab = "Résidus", col = "lightblue", border = "white", probability = TRUE)
+curve(dnorm(x, mean = mean(residus), sd = sd(residus)), add = TRUE, col = "red", lwd = 2)
+
+# 5. QQ-plot
+qqnorm(residus, main = "QQ-Plot des Résidus")
+qqline(residus, col = "red", lwd = 2)
+
+# 6. Résidus carrés 
+plot(residus^2, main = "Résidus au Carré", ylab = "Résidus²", col = "purple", type = "h")
+abline(h = mean(residus^2), col = "red", lty = 2)
+```
+
+
+## III. Modèles ARCH et GARCH
+
+1. Test Arche Engle
+```{r}
+library(FinTS)
+
+# Test ARCH d’Engle
+ArchTest(residus, lags = 12)
+ArchTest(res_subsetARMA, lags=12)
+
+```
+Le test ARCH d'Engle appliqué aux résidus de l'ARIMA(1,0,0)(1,0,1)[12] (p-value = 0,216) et de l'ARMA(12,0,12) subset{AR:1,2 ; MA:12} (p-value > 0,05) n'est pas significatif. Nous ne mettons donc pas en évidence d'hétéroscédastiscité conditionnelle. Conformément aux consignes, nous estimons tout de même un ARCH(1) puis un GARCH(1,1).
+
+```{r}
+
+spec_subsetARMA_ARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+  mean.model     = list(armaOrder = c(12,12), include.mean = TRUE),
+  distribution.model = "norm",
+  fixed.pars = list(
+    # AR coefficients forcés à 0 sauf φ1 et φ12
+    ar2=0, ar3=0, ar4=0, ar5=0, ar6=0, ar7=0, ar8=0, ar9=0, ar10=0, ar11=0,
+    # MA coefficients forcés à 0 sauf θ12
+    ma1=0, ma2=0, ma3=0, ma4=0, ma5=0, ma6=0, ma7=0, ma8=0, ma9=0, ma10=0, ma11=0
+  )
+)
+
+spec_subsetARMA_GARCH <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model     = list(armaOrder = c(12,12), include.mean = TRUE),
+  distribution.model = "norm",
+  fixed.pars = list(
+    ar2=0, ar3=0, ar4=0, ar5=0, ar6=0, ar7=0, ar8=0, ar9=0, ar10=0, ar11=0,
+    ma1=0, ma2=0, ma3=0, ma4=0, ma5=0, ma6=0, ma7=0, ma8=0, ma9=0, ma10=0, ma11=0
+  )
+)
+
+modele_subsetARMA_ARCH <- ugarchfit(spec = spec_subsetARMA_ARCH, data = des_data)
+modele_subsetARMA_GARCH <- ugarchfit(spec = spec_subsetARMA_GARCH, data = des_data)
+```
+
+3. Critères AIC & BIC
+```{r}
+infocriteria(modele_subsetARMA_ARCH)
+infocriteria(modele_subsetARMA_GARCH)
+```
+
+La comparaison des critères montre des écarts très faibles entre les deux modèles. L'AIC est légèrement plus bas pour le GARCH(1,1), suggérant un gain assez minime. En revanche le BIC est légèrement plus bas pour le ARCH(1), ce qui suggère que le modèle ARCH(1) est moins complexe. Ces deux critères ne reflètent pas un avantage d'un modèle par rapport à l'autre. 
+
+On remarque que a dispersion des températures s’avérant systématiquement plus élevée en hiver qu’en été. Nous pouvons donc retenir un modèle à variance saisonnière attribuant un écart-type par mois, ce qui évite d'alourdir le modèle avec un GARCH.
+
+4. Résidus finaux
+```{r}
+z_subsetARMA_GARCH <- residuals(modele_subsetARMA_GARCH, standardize = TRUE)
+
+z_subsetARMA_ARCH <- residuals(modele_subsetARMA_ARCH, standardize = TRUE)
+
+acf(z_subsetARMA_GARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés ARMA(12,12) GARCH(1,1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_subsetARMA_GARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré ARMA(12,12) GARCH(1,1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+acf(z_subsetARMA_ARCH, lag.max = 36, xaxt = "n", main ="ACF des résidus standardisés ARMA(12,12) ARCH(1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+acf(z_subsetARMA_ARCH^2, lag.max = 36, xaxt = "n", main="ACF des résidus standardisés au carré ARMA(12,12) ARCH(1) (subset {AR:1,12 ; MA:12)")
+axis(1, at = 0:36/12, labels = 0:36)
+
+Box.test(z_subsetARMA_GARCH,  lag=20, type="Ljung-Box")
+Box.test(z_subsetARMA_GARCH^2,lag=20, type="Ljung-Box")  
+
+Box.test(z_subsetARMA_ARCH,  lag=20, type="Ljung-Box")
+Box.test(z_subsetARMA_ARCH^2,lag=20, type="Ljung-Box") 
+```
+
+Pour les deux modèles les test des résidus ne sont pas signifiactifs , ce qui suggère une autocorrélation résiduelle légère. En revanche, pour les deux modèles, Box-Ljung indique l'abscence d’hétéroscédasticité résiduelle sur les résidus au carré. De plus, les ACF restent globalement dans les bandes de confiance avec quelques pics isolés vers les lag 12 et 24, ce qui est cohérent avec la saisonnalité. Cependant, il n'y a aucun motif systématique. Ce qui confirme que la moyenne est bien spécifiée et que la variance résiduelle ne présente plus de structure marquée.
+
+Ainsi, nous priviligions au vu de ces résultats le modèle le moins complexe : ARMA(12,0,12) subset {AR:1,12 ; MA:12} - ARCH(1)
+
+## V. Prévision
+
+1/2/3. Prévisions & performances
+```{r}
+
+horizon <- 12
+n <- length(des_data)
+
+train <- window(des_data, end = time(des_data)[n-horizon])
+test <- window(des_data, start = time(des_data)[n-horizon+1])
+
+modele_prev_subsetARMA_ARCH <- ugarchfit(spec = spec_subsetARMA_ARCH, data = train)
+prev <- ugarchforecast(modele_prev_subsetARMA_ARCH, n.ahead=horizon)
+
+alpha <- 0.05
+z <- qnorm(1-alpha/2)
+
+prev_moy <- as.numeric(fitted(prev))
+prev_sigma <- as.numeric(sigma(prev))
+ic_sup <- prev_moy + z*prev_sigma
+ic_inf <- prev_moy - z*prev_sigma
+
+start_prev <- tsp(train)[2] + 1/frequency(train)
+prev_ts <- ts(prev_moy, frequency=12,
+             start = start_prev)
+ic_sup_ts <- ts(ic_sup, frequency=12, start = start_prev)
+ic_inf_ts <- ts(ic_inf, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(12,0,12) subset {AR:1,12 ; MA:12}-ARCH(1) avec IC à 95%")
+lines(prev_ts, col="blue", lwd=2)
+lines(ic_inf_ts, col="red", lty=2)
+lines(ic_sup_ts, col="red", lty=2)
+
+
+des_data_zoom <- window(des_data, start = c(2020, 1))
+
+ylim_vals_subsetARMA_ARCH <- range(des_data_zoom,
+                        prev_ts,
+                        ic_inf_ts,
+                        ic_sup_ts,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(12,0,12) subset {AR:1,12 ; MA:12}-ARCH(1) avec IC à 95%", ylim=ylim_vals_subsetARMA_ARCH)
+lines(prev_ts, col="blue")
+lines(ic_inf_ts, col="red", lty=2)
+lines(ic_sup_ts, col="red", lty=2)
+
+mse <- mse(as.numeric(test), prev_moy)
+mape <- mape(as.numeric(test), prev_moy)
+
+cat("MSE : ", mse, "\n",
+    "MAPE : ", mape)
+```
+
+Nous avons produit une prévision à 12 mois avec le modèle retenu (ARMA(12,12) subset {AR:1,12 ; MA:12} – ARCH(1)) et tracé les prévisions ponctuelles avec leurs IC à 95 %. Les bandes couvrent l'ensemble des observations. 
+On obtient un critère MSE à 1,685 °C², et un critère MAPE à 3,37 %. 3,37 %. Ces niveaux indiquent des erreurs de prévision modérées pour des températures mensuelles : en moyenne, l’écart-type de l’erreur est de l’ordre de 1,3 °C et l’erreur relative tourne autour de 3–4 %. 
+
+4/5. Comparer, analyser et commenter les résultats
+```{r}
+
+prev_subsetARMA <- forecast(modele_subsetARMA, h=horizon, level=95)
+
+prev_moy_subsetARMA <- as.numeric(prev_subsetARMA$mean)
+ic_inf_subsetARMA <- as.numeric(prev_subsetARMA$lower)
+ic_sup_subsetARMA <- as.numeric(prev_subsetARMA$upper)
+
+prev_ts_subsetARMA <- ts(prev_moy_subsetARMA, frequency=12,
+                   start = start_prev)
+ic_sup_ts_subsetARMA <- ts(ic_sup_subsetARMA, frequency=12, start = start_prev)
+ic_inf_ts_subsetARMA <- ts(ic_inf_subsetARMA, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARMA(5,5) avec IC à 95%")
+lines(prev_ts_subsetARMA, col="blue", lwd=2)
+lines(ic_inf_ts_subsetARMA, col="red", lty=2)
+lines(ic_sup_ts_subsetARMA, col="red", lty=2)
+
+ylim_vals_subsetARMA <- range(des_data_zoom,
+                        prev_ts_subsetARMA,
+                        ic_inf_ts_subsetARMA,
+                        ic_sup_ts_subsetARMA,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARMA(5,5) avec IC à 95%", ylim=ylim_vals_subsetARMA)
+lines(prev_ts_subsetARMA, col="blue")
+lines(ic_inf_ts_subsetARMA, col="red", lty=2)
+lines(ic_sup_ts_subsetARMA, col="red", lty=2)
+
+mse_subsetARMA <- mse(as.numeric(test), prev_moy_subsetARMA)
+mape_subsetARMA <- mape(as.numeric(test), prev_moy_subsetARMA)
+
+cat("MSE : ", mse_subsetARMA, "\n",
+    "MAPE : ", mape_subsetARMA)
+
+# Prévision avec auto.arima
+
+modele_prev_SARIMA <- arima(train, 
+                            order = c(1,0,1), 
+                            seasonal = list(order = c(2,0,1), period =12), 
+                            method="CSS-ML")
+prev_SARIMA <- forecast(modele_prev_SARIMA, h=horizon, level=95)
+
+prev_moy_SARIMA <- as.numeric(prev_SARIMA$mean)
+ic_inf_SARIMA <- as.numeric(prev_SARIMA$lower)
+ic_sup_SARIMA <- as.numeric(prev_SARIMA$upper)
+
+prev_ts_SARIMA <- ts(prev_moy_SARIMA, frequency=12,
+                   start = start_prev)
+ic_sup_ts_SARIMA <- ts(ic_sup_SARIMA, frequency=12, start = start_prev)
+ic_inf_ts_SARIMA <- ts(ic_inf_SARIMA, frequency=12, start = start_prev)
+
+ts.plot(des_data, col="black", main="Prévisions ARIMA(1,0,1)(2,0,1)[12] avec IC à 95%")
+
+lines(prev_ts_SARIMA, col="blue", lwd=2)
+lines(ic_inf_ts_SARIMA, col="red", lty=2)
+lines(ic_sup_ts_SARIMA, col="red", lty=2)
+
+ylim_vals_SARIMA <- range(des_data_zoom,
+                        prev_ts_SARIMA,
+                        ic_inf_ts_SARIMA,
+                        ic_sup_ts_SARIMA,
+                        na.rm=TRUE)
+
+ts.plot(des_data_zoom, col="black", 
+        main="Prévisions ARIMA(1,0,1)(2,0,1)[12] avec IC à 95%", ylim=ylim_vals_SARIMA)
+lines(prev_ts_SARIMA, col="blue")
+lines(ic_inf_ts_SARIMA, col="red", lty=2)
+lines(ic_sup_ts_SARIMA, col="red", lty=2)
+
+mse_SARIMA <- mse(as.numeric(test), prev_moy_SARIMA)
+mape_SARIMA <- mape(as.numeric(test), prev_moy_SARIMA)
+
+cat("MSE : ", mse_SARIMA, "\n",
+    "MAPE : ", mape_SARIMA)
+
+
+performances <- data.frame(
+  Model = c("subset ARMA-ARCH","subset ARMA","SARIMA"),
+  MSE   = c(mse,
+            mse_subsetARMA,
+            mse_SARIMA),
+  MAPE   = c(mape,
+            mape_subsetARMA,
+            mape_SARIMA)
+)
+print(performances)
+```
+
+Nous avons décidé également d'ajouter le modèle proposé par la fonction auto.arima afin de compléter cette étude. La comparaison nous montre que le SARIMA fournit les meilleurs prévisions car son critère MSE. Il capture ainsi plus finement la dynamique moyenne et la saisonnalité de la série de données. De plus, le modèle ARMA-ARCH affiche le meilleur critère MAPE. Par ailleurs les tests ARCH non significatifs et les faibles gains AIC/BIC nous indiquent que la dynamique de volatilité apporte peu pour les températures puisque la variabilité est surtout saisonière. Ainsi la qualité des prévisions dépend surtout de la modélisation de la moyenne qui refléte la tendance lente de la série et notamment de la forte saisonnalité annuelle qui détermine le niveau de température mois par mois.
+
+Le modèle SARIMA se présente comme le meilleur modèle puisqu'il minimise l'erreur en °C. Cependant dans le cadre du TP, nous retenons le modèle ARMA subset - ARCH(1) puisqu'il offre la meilleure précision relative et une erreur proche de celle du modèle SARIMA. A contrario, le modèle ARMA subset ne capte pas suffisemment la saisonnalité et ainsi dégrade ses performances prédictives.
+
+
+## V. Bonus
+
+
+
+# Introduction
+
+Ce document présente une analyse **itérative complète** du taux de change EUR/USD suivant la **méthodologie de Box-Jenkins étendue** :
+
+**Processus itératif** (jusqu'à 50 itérations) :
+1. Estimer ARIMA sur les données (ou résidus de l'itération précédente)
+2. Tester les résidus ARIMA pour effets ARCH
+3. Si effets ARCH → Estimer GARCH, sinon → STOP
+4. Extraire les résidus standardisés du modèle complet
+5. **Recommencer avec ces résidus** comme nouvelle série
+6. Continuer jusqu'à : convergence (plus d'effets ARCH) OU 50 itérations
+
+```{r packages}
+packages <- c("quantmod", "tseries", "forecast", "rugarch", "FinTS", 
+              "dplyr", "tidyr", "lubridate", "ggplot2", "gridExtra", 
+              "moments", "psych", "knitr", "kableExtra")
+
+for (pkg in packages) {
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    install.packages(pkg, quiet = TRUE)
+    library(pkg, character.only = TRUE, quietly = TRUE)
+  }
+}
+```
+
+# 1. Collecte et Préparation des Données
+
+```{r data_collection}
+ticker <- "EURUSD=X"
+getSymbols(ticker, src = "yahoo", from = "2022-01-01", to = "2024-12-31", auto.assign = TRUE)
+
+close_prices <- Cl(get(ticker))
+log_returns <- diff(log(close_prices))
+log_returns <- na.omit(log_returns)
+
+stats_desc <- data.frame(
+  Statistique = c("Nombre d'observations", "Moyenne", "Écart-type", "Minimum", 
+                  "Maximum", "Skewness", "Kurtosis"),
+  Valeur = c(
+    length(log_returns),
+    round(mean(log_returns), 6),
+    round(sd(log_returns), 6),
+    round(min(log_returns), 6),
+    round(max(log_returns), 6),
+    round(moments::skewness(as.numeric(log_returns)), 4),
+    round(moments::kurtosis(as.numeric(log_returns)), 4)
+  )
+)
+
+kable(stats_desc, caption = "Statistiques Descriptives des Rendements Logarithmiques") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r visualisation_initiale}
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+plot(close_prices, main = "EUR/USD - Prix de Clôture", ylab = "Taux de Change", col = "darkblue", lwd = 1.5)
+plot(log_returns, main = "Rendements Logarithmiques", ylab = "Rendements", col = "steelblue", type = "h")
+plot(log_returns^2, main = "Rendements² (Proxy Volatilité)", ylab = "Rendements²", col = "red3", type = "h")
+hist(log_returns, breaks = 50, main = "Distribution des Rendements", 
+     xlab = "Rendements", col = "lightblue", border = "white", probability = TRUE)
+lines(density(log_returns), col = "red", lwd = 2)
+```
+
+# 2. Tests de Stationnarité Initiaux
+
+```{r stationarity}
+adf_result <- adf.test(log_returns)
+kpss_result <- kpss.test(log_returns)
+
+tests_stationnarite <- data.frame(
+  Test = c("Augmented Dickey-Fuller", "KPSS"),
+  Statistique = c(round(adf_result$statistic, 4), round(kpss_result$statistic, 4)),
+  `P-value` = c(round(adf_result$p.value, 4), round(kpss_result$p.value, 4)),
+  Conclusion = c(
+    ifelse(adf_result$p.value < 0.05, "✓ Stationnaire", "✗ Non-stationnaire"),
+    ifelse(kpss_result$p.value >= 0.05, "✓ Stationnaire", "✗ Non-stationnaire")
+  )
+)
+
+kable(tests_stationnarite, caption = "Tests de Stationnarité") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+# 3. Processus Itératif Complet (Max 50 itérations)
+
+```{r iteration_complete, results='asis'}
+# Initialisation
+serie_courante <- log_returns
+max_iterations <- 50
+convergence <- FALSE
+iteration <- 0
+
+# Stockage des résultats
+historique_iterations <- data.frame()
+modeles_estimes <- list()
+
+cat("\n## Journal des Itérations\n\n")
+cat("**Principe** : À chaque itération, on teste si les résidus nécessitent un nouveau cycle ARIMA-GARCH.\n\n")
+cat("---\n\n")
+
+while (iteration < max_iterations && !convergence) {
+  iteration <- iteration + 1
+  
+  cat("### ITÉRATION ", iteration, "\n\n")
+  
+  # ==========================================
+  # ÉTAPE 1 : ESTIMATION ARIMA
+  # ==========================================
+  
+  cat("#### Étape 1.", iteration, ".A - Estimation ARIMA\n\n")
+  
+  fit_arima <- auto.arima(serie_courante,
+                          seasonal = FALSE,
+                          stepwise = FALSE,
+                          approximation = FALSE,
+                          ic = "aicc",
+                          trace = FALSE)
+  
+  arima_order <- arimaorder(fit_arima)
+  cat("- Modèle sélectionné : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n")
+  cat("- AICc = ", round(fit_arima$aicc, 2), "\n\n")
+  
+  residus_arima <- residuals(fit_arima)
+  
+  # ==========================================
+  # ÉTAPE 2 : TESTS SUR RÉSIDUS ARIMA
+  # ==========================================
+  
+  cat("#### Étape 1.", iteration, ".B - Tests sur résidus ARIMA\n\n")
+  
+  lb_residus <- Box.test(residus_arima, type = "Ljung-Box", lag = 40)
+  lb_residus2 <- Box.test(residus_arima^2, type = "Ljung-Box", lag = 40)
+  arch_test <- ArchTest(residus_arima, lags = 10)
+  
+  tests_iter <- data.frame(
+    Test = c("Ljung-Box (résidus)", "Ljung-Box (résidus²)", "ARCH"),
+    `P-value` = c(round(lb_residus$p.value, 4), round(lb_residus2$p.value, 4), 
+                  round(arch_test$p.value, 4)),
+    Décision = c(
+      ifelse(lb_residus$p.value > 0.05, "✓ OK", "✗ Autocorrélation"),
+      ifelse(lb_residus2$p.value > 0.05, "✓ OK", "✗ Hétéroscédasticité"),
+      ifelse(arch_test$p.value > 0.05, "✓ OK", "✗ Effet ARCH")
+    )
+  )
+  
+  print(kable(tests_iter, caption = paste("Tests Itération", iteration)) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+  
+  cat("\n")
+  
+  # ==========================================
+  # DÉCISION : GARCH NÉCESSAIRE ?
+  # ==========================================
+  
+  if (arch_test$p.value < 0.05) {
+    cat("**Décision** : Effet ARCH détecté (p = ", round(arch_test$p.value, 4), ") → **Estimation GARCH**\n\n")
+    
+    # ==========================================
+    # ÉTAPE 3 : ESTIMATION GARCH
+    # ==========================================
+    
+    cat("#### Étape 1.", iteration, ".C - Comparaison modèles GARCH\n\n")
+    
+    models_list <- list(
+      list(name = "GARCH(1,1)", model = "sGARCH", order = c(1,1)),
+      list(name = "GARCH(1,2)", model = "sGARCH", order = c(1,2)),
+      list(name = "GARCH(2,1)", model = "sGARCH", order = c(2,1)),
+      list(name = "TGARCH(1,1)", model = "fGARCH", submodel = "TGARCH", order = c(1,1)),
+      list(name = "EGARCH(1,1)", model = "eGARCH", order = c(1,1)),
+      list(name = "GJR-GARCH(1,1)", model = "gjrGARCH", order = c(1,1))
+    )
+    
+    results_garch <- data.frame()
+    fitted_models <- list()
+    
+    for (i in seq_along(models_list)) {
+      model_spec <- models_list[[i]]
+      
+      tryCatch({
+        if (model_spec$model == "fGARCH") {
+          spec <- ugarchspec(
+            variance.model = list(model = model_spec$model, 
+                                  submodel = model_spec$submodel,
+                                  garchOrder = model_spec$order),
+            mean.model = list(armaOrder = c(arima_order[1], arima_order[3]), 
+                              include.mean = TRUE),
+            distribution.model = "norm"
+          )
+        } else {
+          spec <- ugarchspec(
+            variance.model = list(model = model_spec$model, 
+                                  garchOrder = model_spec$order),
+            mean.model = list(armaOrder = c(arima_order[1], arima_order[3]), 
+                              include.mean = TRUE),
+            distribution.model = "norm"
+          )
+        }
+        
+        fit <- ugarchfit(spec = spec, data = serie_courante, solver = "hybrid")
+        
+        fitted_models[[model_spec$name]] <- fit
+        
+        results_garch <- rbind(results_garch, data.frame(
+          Modèle = model_spec$name,
+          AIC = round(infocriteria(fit)[1], 4),
+          BIC = round(infocriteria(fit)[2], 4),
+          Convergence = ifelse(convergence(fit) == 0, "✓", "✗")
+        ))
+      }, error = function(e) {
+        results_garch <<- rbind(results_garch, data.frame(
+          Modèle = model_spec$name,
+          AIC = NA,
+          BIC = NA,
+          Convergence = "Erreur"
+        ))
+      })
+    }
+    
+    results_garch <- results_garch[order(results_garch$AIC, na.last = TRUE), ]
+    
+    print(kable(results_garch, caption = paste("Comparaison GARCH - Itération", iteration)) %>%
+      kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+    
+    cat("\n")
+    
+    best_model_name <- results_garch$Modèle[1]
+    best_fit <- fitted_models[[best_model_name]]
+    
+    cat("- **Meilleur modèle** : ", best_model_name, " (AIC = ", round(results_garch$AIC[1], 2), ")\n\n")
+    
+    # ==========================================
+    # ÉTAPE 4 : VALIDATION MODÈLE GARCH
+    # ==========================================
+    
+    cat("#### Étape 1.", iteration, ".D - Validation modèle complet\n\n")
+    
+    residus_std_garch <- residuals(best_fit, standardize = TRUE)
+    
+    lb_garch <- Box.test(residus_std_garch, type = "Ljung-Box", lag = 40)
+    lb_garch2 <- Box.test(residus_std_garch^2, type = "Ljung-Box", lag = 40)
+    arch_garch <- ArchTest(residus_std_garch, lags = 10)
+    
+    tests_garch_iter <- data.frame(
+      Test = c("Ljung-Box (résidus std.)", "Ljung-Box (résidus² std.)", "ARCH (résidus std.)"),
+      `P-value` = c(round(lb_garch$p.value, 4), round(lb_garch2$p.value, 4), 
+                    round(arch_garch$p.value, 4)),
+      Décision = c(
+        ifelse(lb_garch$p.value > 0.05, "✓ OK", "✗ Autocorrélation"),
+        ifelse(lb_garch2$p.value > 0.05, "✓ OK", "✗ Hétéroscédasticité"),
+        ifelse(arch_garch$p.value > 0.05, "✓ OK", "✗ Effet ARCH")
+      )
+    )
+    
+    print(kable(tests_garch_iter, caption = paste("Validation GARCH - Itération", iteration)) %>%
+      kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+    
+    cat("\n")
+    
+    # Enregistrement
+    historique_iterations <- rbind(historique_iterations, data.frame(
+      Iteration = iteration,
+      Modele_ARIMA = paste0("ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")"),
+      Modele_GARCH = best_model_name,
+      ARCH_pvalue = round(arch_garch$p.value, 4),
+      LB_residus2_pvalue = round(lb_garch2$p.value, 4),
+      Convergence_atteinte = ifelse(arch_garch$p.value > 0.05 && lb_garch2$p.value > 0.05, "OUI", "NON")
+    ))
+    
+    modeles_estimes[[paste0("Iter_", iteration)]] <- list(
+      arima = fit_arima,
+      garch = best_fit,
+      residus = residus_std_garch
+    )
+    
+    # ==========================================
+    # DÉCISION DE CONVERGENCE
+    # ==========================================
+    
+    if (arch_garch$p.value > 0.05 && lb_garch2$p.value > 0.05) {
+      cat("**CONVERGENCE ATTEINTE** : Plus d'effet ARCH résiduel !\n\n")
+      cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], 
+          ") + ", best_model_name, "**\n\n")
+      convergence <- TRUE
+    } else {
+      cat("Effets résiduels détectés → **Itération suivante nécessaire**\n\n")
+      cat("Les résidus standardisés deviennent la nouvelle série à modéliser\n\n")
+      serie_courante <- residus_std_garch
+    }
+    
+  } else {
+    cat("**Décision** : Pas d'effet ARCH (p = ", round(arch_test$p.value, 4), ") → **ARIMA seul suffit**\n\n")
+    
+    historique_iterations <- rbind(historique_iterations, data.frame(
+      Iteration = iteration,
+      Modele_ARIMA = paste0("ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")"),
+      Modele_GARCH = "Aucun",
+      ARCH_pvalue = round(arch_test$p.value, 4),
+      LB_residus2_pvalue = round(lb_residus2$p.value, 4),
+      Convergence_atteinte = "OUI"
+    ))
+    
+    modeles_estimes[[paste0("Iter_", iteration)]] <- list(
+      arima = fit_arima,
+      garch = NULL,
+      residus = residus_arima
+    )
+    
+    cat("**CONVERGENCE ATTEINTE** : Modèle ARIMA seul est adéquat !\n\n")
+    cat("Modèle final : **ARIMA(", arima_order[1], ",", arima_order[2], ",", arima_order[3], ")**\n\n")
+    convergence <- TRUE
+  }
+  
+  cat("---\n\n")
+}
+
+# ==========================================
+# SYNTHÈSE FINALE
+# ==========================================
+
+cat("# 4. Synthèse du Processus Itératif\n\n")
+
+if (convergence) {
+  cat("**Convergence atteinte après ", iteration, " itération(s)**\n\n")
+} else {
+  cat("**Maximum d'itérations atteint (50) sans convergence complète**\n\n")
+}
+
+print(kable(historique_iterations, caption = "Historique Complet des Itérations") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  column_spec(6, bold = TRUE, color = ifelse(historique_iterations$Convergence_atteinte == "OUI", "green", "red")))
+
+cat("\n")
+```
+
+# 5. Analyse Détaillée du Modèle Final
+
+```{r analyse_finale, results='asis'}
+modele_final <- modeles_estimes[[paste0("Iter_", iteration)]]
+
+cat("## 5.1 Spécification du Modèle Final\n\n")
+
+if (!is.null(modele_final$garch)) {
+  cat("**Modèle complet retenu** : ARIMA-GARCH combiné\n\n")
+  cat("```\n")
+  print(modele_final$garch)
+  cat("```\n\n")
+} else {
+  cat("**Modèle retenu** : ARIMA seul\n\n")
+  cat("```\n")
+  print(summary(modele_final$arima))
+  cat("```\n\n")
+}
+
+cat("## 5.2 Analyse Graphique des Résidus Finaux\n\n")
+
+residus_finaux <- modele_final$residus
+
+par(mfrow = c(3, 2), mar = c(4, 4, 3, 1))
+
+# Série temporelle
+plot(residus_finaux, main = "Résidus Finaux Standardisés", ylab = "Résidus", 
+     col = "darkgreen", type = "h")
+abline(h = 0, col = "red", lty = 2)
+
+# Histogramme
+hist(residus_finaux, breaks = 50, main = "Distribution des Résidus", 
+     xlab = "Résidus", col = "lightgreen", border = "white", probability = TRUE)
+curve(dnorm(x, mean = mean(residus_finaux), sd = sd(residus_finaux)), 
+      add = TRUE, col = "red", lwd = 2)
+
+# QQ-plot
+qqnorm(residus_finaux, main = "QQ-Plot")
+qqline(residus_finaux, col = "red", lwd = 2)
+
+# ACF
+acf(residus_finaux, main = "ACF des Résidus", lag.max = 30)
+
+# ACF résidus²
+acf(residus_finaux^2, main = "ACF des Résidus²", lag.max = 30, col = "purple")
+
+# Volatilité (si GARCH)
+if (!is.null(modele_final$garch)) {
+  sigma_finale <- sigma(modele_final$garch)
+  plot(sigma_finale, main = "Volatilité Conditionnelle Finale", 
+       ylab = "σ(t)", col = "red3", lwd = 1.5)
+} else {
+  plot(residus_finaux^2, main = "Carrés des Résidus", 
+       ylab = "Résidus²", col = "purple", type = "h")
+}
+
+cat("\n## 5.3 Tests de Diagnostic Finaux\n\n")
+
+lb_final <- Box.test(residus_finaux, type = "Ljung-Box", lag = 40)
+lb_final2 <- Box.test(residus_finaux^2, type = "Ljung-Box", lag = 40)
+arch_final <- ArchTest(residus_finaux, lags = 10)
+
+tests_finaux <- data.frame(
+  Test = c("Ljung-Box (résidus)", "Ljung-Box (résidus²)", "ARCH"),
+  Statistique = c(round(lb_final$statistic, 4), round(lb_final2$statistic, 4), 
+                  round(arch_final$statistic, 4)),
+  `P-value` = c(round(lb_final$p.value, 4), round(lb_final2$p.value, 4), 
+                round(arch_final$p.value, 4)),
+  Interprétation = c(
+    ifelse(lb_final$p.value > 0.05, "✓ Résidus = bruit blanc", "✗ Autocorrélation résiduelle"),
+    ifelse(lb_final2$p.value > 0.05, "✓ Pas d'hétéroscédasticité", "✗ Hétéroscédasticité résiduelle"),
+    ifelse(arch_final$p.value > 0.05, "✓ Pas d'effet ARCH", "✗ Effet ARCH résiduel")
+  )
+)
+
+print(kable(tests_finaux, caption = "Tests de Diagnostic sur le Modèle Final") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+
+cat("\n")
+```
+
+# 6. Conclusion
+
+Cette étude adopte une approche itérative pour la modélisation de la série temporelle des rendements EUR/USD. Plutôt que de s'en tenir à l'estimation d'un unique modèle ARIMA-GARCH, cette méthodologie examine systématiquement les résidus standardisés afin de s'assurer qu'aucune structure résiduelle n'a été négligée. Le processus commence par l'estimation d'un modèle ARIMA sur la série initiale, suivi de tests d'effets ARCH sur les résidus. Lorsque des effets ARCH sont détectés, six spécifications GARCH sont comparées selon le critère d'information d'Akaike (AIC), et le modèle optimal est retenu. Les résidus standardisés du modèle sélectionné sont ensuite testés à nouveau, et s'ils présentent encore des effets ARCH, ils deviennent la nouvelle série à modéliser pour l'itération suivante. Ce processus se poursuit jusqu'à convergence ou jusqu'à un maximum de 50 itérations. Dans le cadre de cette analyse, la convergence a été atteinte dès la première itération, indiquant que le modèle initial capturait adéquatement l'ensemble de la structure temporelle et de la volatilité conditionnelle des rendements. Cette approche systématique garantit la robustesse du modèle final et valide son utilisation pour des fins de prévision, tout en limitant les risques de surajustement grâce au critère d'arrêt imposé.
+
+
+
+
