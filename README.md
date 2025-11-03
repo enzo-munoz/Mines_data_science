@@ -5,7 +5,7 @@ Chaque TP explore un thème fondamental de l’analyse de données et de l’app
 
 ---
 
-## 🧩 TP1 – Arbres de décision, Forêts aléatoires et Forêts d’isolation
+## TP1 – Arbres de décision, Forêts aléatoires et Forêts d’isolation
 
 ### 🎯 Objectif
 Découvrir et expérimenter les méthodes d’apprentissage basées sur les arbres de décision.
@@ -22,7 +22,7 @@ Découvrir et expérimenter les méthodes d’apprentissage basées sur les arbr
 
 ---
 
-## 📊 TP2 – Analyse en Composantes Principales (ACP / PCA)
+## TP2 – Analyse en Composantes Principales (ACP / PCA)
 
 ### 🎯 Objectif
 Apprendre à réduire la dimension d’un jeu de données tout en conservant la majorité de l’information.
@@ -39,7 +39,7 @@ Apprendre à réduire la dimension d’un jeu de données tout en conservant la 
 
 ---
 
-## 🌡️ TP3 – Séries temporelles : Prévision de températures
+## TP3 – Séries temporelles : Prévision de températures
 
 ### 🎯 Objectif
 Analyser et modéliser une série temporelle de températures pour en comprendre la structure et en prévoir l’évolution.
