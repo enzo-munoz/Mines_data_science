@@ -70,5 +70,5 @@ Analyser et modéliser une série temporelle de températures pour en comprendre
 ## 👨‍🎓 Auteur
 
 **Munoz Enzo**  - **Hugo Munier** - **Maxime Guilbaud**
-*Majeure Science des Données – Mines Saint-Étienne*  
+Majeure Science des Données – Mines Saint-Étienne 
 Année académique **2024–2025**
