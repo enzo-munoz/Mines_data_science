@@ -503,8 +503,11 @@ plot(cumsum(res$eig[,2]), type = "b",
 # Cercle des corrélations (ne change pas)
 plot.PCA(res, choix = "var", title = "Cercle des corrélations des variables")
 ```
-Pour faire l'ACP on a normalisé les données. Il est important dans ce cas de faire la normalisation des données pour éviter la sur-domination des variables à grande variance, par exemple : Tot_OcNoDecana ayant pour 3Q - 1Q = 560 >> B avec 3Q - 1Q = 71. J'ai donc scale de manière linéaire toutes les variables. En plus on ne sait pas si les valeurs ont les mêmes unités. C'est probablement pas le cas. On a une décroissance de la variance expliquée par les composantes qui décroît de manière exponentielle. Il n'y a pas de cassures. On peut garder les composantes sui ont des valeurs propres supérieurs à 1 ou alors garder les composantes qui en somme dépasse les 90% de variances expliqués cumulé. 
+Avant de réaliser l’ACP, les données ont été normalisées. Cette étape est essentielle afin d’éviter la sur-pondération des variables présentant une forte variance.
+Par exemple, la variable Tot_OcNoDecana a une amplitude interquartile (3Q – 1Q) d’environ 560, tandis que la variable B n’a qu’une amplitude de 71. Sans normalisation, la première aurait donc une influence disproportionnée sur les axes factoriels.
+J’ai donc appliqué un centrage-réduction linéaire à l’ensemble des variables quantitatives. De plus, les unités de mesure ne sont pas nécessairement homogènes entre les variables, ce qui renforce la nécessité de cette étape.
 
+La décroissance de la variance expliquée par les composantes principales suit une tendance exponentielle sans cassure nette. On peut alors retenir soit les composantes dont les valeurs propres sont supérieures à 1, soit celles qui, cumulées, expliquent au moins 90 % de la variance totale.
 
 
 ```{r}
@@ -515,14 +518,25 @@ plot.PCA(res, choix = "ind",
          title = "Individus colorés selon le type d'environnement")
 
 ```
-Sur cette représentation de la répartition des données sur les 2 composantes principales. On voit que l'axe des absisses délimite source industrie 80 % en dessous à peu près. Faut-il retirer les point à l'extrémité droite en bas? 
+Sur la projection des individus sur les deux premières composantes principales, on observe que l’axe des abscisses sépare nettement les échantillons provenant de sources industrielles : environ 80 % d’entre eux se situent dans la partie inférieure du graphique.
+Les points situés à l’extrémité droite et en bas du plan factoriel semblent isolés et pourraient correspondre à des observations atypiques ou extrêmes.
+
+Avant de décider de les retirer, il est important de vérifier leur signification réelle :
+
+S’ils représentent des mesures valides mais issues d’un contexte industriel spécifique, les conserver pourrait biaiser l’analyse globale des campagnes non industrielles.
+
+En revanche, s’il s’agit de valeurs aberrantes ou de conditions expérimentales non représentatives, il est justifié de les exclure pour obtenir une interprétation plus fidèle de la structure principale des données.
+
+Dans ce cas, il serait donc pertinent de tester une ACP sans ces individus extrêmes afin de comparer la stabilité des axes et l’évolution de la variance expliquée.
 ```{r}
 plot.PCA(res, choix = "ind", 
        habillage = "SAISON",
        label = "quali", cex = 0.8,
        title = "Individus colorés selon la saison")
 ```
-On voit cette fois une délimitation claire entre été et hiver symbolisé par l'axe des abscisses. L'individu en bas à droite lui semble être mal classé. C'est un indiv d'été alors qu'il est sous la droite des abscisses. On va donc refaire l'ACP en éliminant cette individu. 
+Sur cette nouvelle représentation, on observe une séparation nette entre les saisons d’été et d’hiver, matérialisée par l’axe des abscisses.
+Cependant, un individu situé en bas à droite semble mal classé : bien qu’il appartienne à la saison d’été, il se positionne du côté inférieur de l’axe, associé plutôt aux observations hivernales.
+
 
 ```{r}
 plot.PCA(res, choix = "ind", 
@@ -593,7 +607,7 @@ plot.PCA(res_correct, choix = "ind",
        title = "Individus colorés selon la saison")
 ```
 
-On ne voit toujours pas vraiment les catégories qui se dégage dans cette configuration. 
+On ne voit pas vraiment les catégories qui se dégage dans cette configuration. 
 ```{r}
 plot.PCA(res_correct, choix = "ind", 
        habillage = "Campagne",
