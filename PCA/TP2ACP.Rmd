@@ -450,20 +450,9 @@ for (i in 2:ncol(moyennes_saison)) {
 # Réinitialiser les paramètres graphiques
 par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
 ```
+Pour répondre à la question de la différence dans nos données entre hiver et été les histogrammes montrent une augmentation des concentrations dans l'ensemble des composés chimiques captés. On va le voir aussi avec le graphe de projection sur les 2 composantes principales. 
 
-
-```{r}
-# Corrélation entre variables (vue rapide)
-heatmap(cor(data_num, use = "pairwise.complete.obs"),
-        Colv = NA, Rowv = NA,
-        col = colorRampPalette(c("blue", "white", "red"))(20),
-        main = "Corrélations entre composés chimiques")
-
-# creation de la matrice X , on va normaliser car les grandeurs de nos données ont des unités et ordres de grandeurs differentes
-```
-
-
-Il est important de faire la normalisation des données pour éviter la sur-domination des variables à grande variance, par exemple : Tot_OcNoDecana ayant pour 3Q - 1Q = 560 >> B avec 3Q - 1Q = 71. J'ai donc scale de manière linéaire toutes les variables.
+En faisant une première ACP on s'est rendu compte qu'un individu était très à l'écart de l'emble des autres données. 
 
 ```{r}
 coords <- res$ind$coord
@@ -474,9 +463,14 @@ print("Ses coordonnées (Dim.1 et Dim.2) sont :")
 print(coords[idx_max_dim1, 1:2])
 idx_min_dim2 <- which.min(coords[, 2])
 print(paste("Individu avec le min sur Dim.2 (Index):", idx_min_dim2))
-print("Ses coordonnées (Dim.1 et Dim.2) sont :")
-print(coords[idx_min_dim2, 1:2])
 
+data[idx_min_dim2, ]
+
+
+```
+On voit que l'individu a été mesuré pendant la campagne CA2, en été qu'on a déjà repéré auparavant comme ayant des relevés pour les capteurs chimiques plus haut que les autres. 
+
+```{r}
 nb_col_num <- ncol(data_num)
 nb_col_total <- ncol(data)
 indices_quali <- (nb_col_num + 1):nb_col_total
@@ -485,7 +479,7 @@ print("Indices des variables qualitatives :")
 print(indices_quali)
 print("Noms de ces variables :")
 print(colnames(data)[indices_quali])
-data <- data[-idx_max_dim1, ]
+
 res_correct <- PCA(data,
                    scale.unit = TRUE,   
                    quali.sup = indices_quali, 
@@ -493,40 +487,6 @@ res_correct <- PCA(data,
                    graph = FALSE)       
 
 summary(res_correct)
-
-# Plan factoriel des individus (PROPRE)
-plot.PCA(res_correct, 
-         choix = "ind", 
-         label = "quali",  
-         title = "Projection (corrigée) des individus sur le plan (1,2)")
-
-plot.PCA(res_correct, choix = "ind", 
-       habillage = "SAISON",
-       label = "quali", cex = 0.8,
-       title = "Individus colorés selon la saison")
-
-plot.PCA(res_correct, choix = "ind", 
-         habillage = "TYPE",
-        label = "quali", cex = 0.8,
-         title = "Individus colorés selon le type d'environnement")
-
-# Cercle des corrélations (ne change pas)
-plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des variables")
-```
-
-```{r}
-summary(data_num)
-X <- scale(data_num, center = TRUE, scale = TRUE)
-data<- cbind(X, data_cat)
-summary(X)
-
-res <- PCA(X, 
-           quali.sup = 1:4,  
-           scale.unit = TRUE,
-           graph = TRUE)
-
-
-summary(res)
 ```
 
 
@@ -544,9 +504,84 @@ plot(cumsum(res$eig[,2]), type = "b",
      xlab = "Nombre de composantes",
      ylab = "Variance cumulée (%)",
      col = "red", pch = 19)
+# Cercle des corrélations (ne change pas)
+plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des variables")
+```
+Pour faire l'ACP on a normalisé les données. Il est important dans ce cas de faire la normalisation des données pour éviter la sur-domination des variables à grande variance, par exemple : Tot_OcNoDecana ayant pour 3Q - 1Q = 560 >> B avec 3Q - 1Q = 71. J'ai donc scale de manière linéaire toutes les variables. En plus on ne sait pas si les valeurs ont les mêmes unités. C'est probablement pas le cas. On a une décroissance de la variance expliquée par les composantes qui décroît de manière exponentielle. Il n'y a pas de cassures. On peut garder les composantes sui ont des valeurs propres supérieurs à 1 ou alors garder les composantes qui en somme dépasse les 90% de variances expliqués cumulé. 
 
-# Plan factoriel des individus
-plot.PCA(res, choix = "ind", title = "Projection des individus sur le plan (1,2)")
 
+
+```{r}
+
+plot.PCA(res_correct, choix = "ind", 
+         habillage = "TYPE",
+        label = "quali", cex = 0.8,
+         title = "Individus colorés selon le type d'environnement")
+
+```
+Sur cette représentation de la répartition des données sur les 2 composantes principales. On voit que l'axe des absisses délimite source industrie 80 % en dessous à peu près. Faut-il retirer les point à l'extrémité droite en bas? 
+```{r}
+plot.PCA(res_correct, choix = "ind", 
+       habillage = "SAISON",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
+```
+On voit cette fois une délimitation claire entre été et hiver symbolisé par l'axe des abscisses. L'individu en bas à droite lui semble être mal classé. C'est un indiv d'été alors qu'il est sous la droite des abscisses. On va donc refaire l'ACP en éliminant cette individu. 
+
+```{r}
+data <- data[-idx_max_dim1, ]
+nb_col_num <- ncol(data_num)
+nb_col_total <- ncol(data)
+indices_quali <- (nb_col_num + 1):nb_col_total
+
+print("Indices des variables qualitatives :")
+print(indices_quali)
+print("Noms de ces variables :")
+print(colnames(data)[indices_quali])
+
+res_correct <- PCA(data,
+                   scale.unit = TRUE,   
+                   quali.sup = indices_quali, 
+                   ncp = 5,             
+                   graph = FALSE)       
+
+summary(res_correct)
+
+
+# Cercle des corrélations (ne change pas)
+plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des variables")
+
+```
+
+
+```{r}
+
+
+barplot(res$eig[,2],
+        names.arg = 1:nrow(res$eig),
+        main = "Pourcentage de variance expliquée par composante",
+        xlab = "Composante principale",
+        ylab = "Variance expliquée (%)",
+        col = "skyblue")
+
+#Cumul des variances expliquées ===
+plot(cumsum(res$eig[,2]), type = "b",
+     main = "Cumul de la variance expliquée",
+     xlab = "Nombre de composantes",
+     ylab = "Variance cumulée (%)",
+     col = "red", pch = 19)
+
+```
+```{r}
+plot.PCA(res_correct, choix = "ind", 
+       habillage = "SAISON",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
+```
+```{r}
+plot.PCA(res_correct, choix = "ind", 
+       habillage = "TYPE",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
 ```
 
