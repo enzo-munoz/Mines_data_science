@@ -45,7 +45,8 @@ trouver_lignes_atypiques(data, "10_ane")
 trouver_lignes_atypiques(data, "E")
 ```
 
-On remarque que pour les données un peu atypique on a un facteur commun qui est le fait que ce soit en campagne CA2 pour la plupart qu'elles sont là. Il faudrait connaître plus d'information sur les conditions dans lesquelles ont été mené ces campagnes. 
+On observe que la plupart des données atypiques proviennent de la campagne CA2. Il serait donc nécessaire de disposer de davantage d’informations sur les conditions dans lesquelles cette campagne a été menée, afin de mieux comprendre l’origine de ces anomalies.
+
 
 
 
@@ -71,7 +72,7 @@ for (var in colonnes_numeriques) {
 par(mfrow = c(1, 1)) # Réinitialiser les paramètres graphiques
 ```
 
-On voit donc bien qu'en fonction de la campagne on obtient pas la même distribution dans nos capteurs chimiques et que la campagne CA2 est la campagne avec la plus grande variance et des valeurs globalement plus haute au niveau des capteurs chimiques. 
+On constate donc que la distribution des valeurs des capteurs chimiques varie selon la campagne. En particulier, la campagne CA2 présente la variance la plus élevée, ainsi que des valeurs globalement plus élevées sur l’ensemble des capteurs chimiques.
 
 ```{r}
 
@@ -87,10 +88,12 @@ data$TYPE[data$TYPE == "?"] <- "sourceindustrie"
 ```
 
 
-On a remarqué que dans les données certaines valeurs de type sont des "?" qui signifie un manque d'information sur le type. On compare pour les types des localisations où s'est produit l'anomalie. Pour la localisation P10 tous les types sont sourceindustrie. On a d'autant plus remarqué que pour toutes les localisations on associe qu'un seul type parmi (Rural, urbain, compostage...). On peut donc légitimement imputer le type sourceindustrie. 
+Nous avons constaté que certaines valeurs de la variable "type" sont renseignées par "?", ce qui indique une absence d’information. Afin de les imputer, nous avons examiné les types associés aux localisations dans lesquelles les anomalies se sont produites.
 
+Pour la localisation P10, tous les enregistrements disponibles sont associés au type sourceindustrie. De plus, nous avons observé que chaque localisation n’est associée qu’à un seul type (parmi rural, urbain, compostage, sourceindustrie, etc.). Il est donc cohérent et justifié d’imputer le type sourceindustrie pour P10.
 
-Pour la localisation P22, on a pas d'autres localisation P22
+En revanche, pour la localisation P22, nous ne disposons d’aucune autre occurrence permettant d’identifier le type associé.
+
 
 
 ```{r}
@@ -105,7 +108,7 @@ for (col in names(data_num)) {
 
 
 ```
-Même si on voit que les valeurs captées sont à la localisation P22 sont proches des médianes des distributions dans chaque catégorie pour une même campagne. Le fait de ne pas avoir d'autre localisation et surtout pas de type ne sert pas à répondre aux questions évoquer en introduction à part pour la différence entre les campagnes d'hiver et d'été mais ppur le coup supprimer une ligne ne pose pas de problème.  
+Bien que les valeurs mesurées à la localisation P22 soient proches des médianes observées dans les différentes catégories, l’absence totale d’autres occurrences pour cette localisation et surtout l’absence de type associé ne permettent pas d’exploiter cette donnée pour répondre aux questions posées en introduction. À l’exception d’illustrer la différence générale entre campagnes d’hiver et d’été, cette observation n’apporte pas d’information utile. Par conséquent, la suppression de cette ligne n’impacte pas l’analyse et peut être considérée comme acceptable. 
 
 ```{r}
 v<- data[rowSums(data == 0, na.rm = TRUE) > 0, 1:15]
