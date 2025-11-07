@@ -1,0 +1,277 @@
+---
+title: "TP AFC - Partie 3"
+author: "Enzo Munoz - Hugo Munier - Maxime Guilbaud"
+date: "2025-11-07"
+output:
+  pdf_document:
+    latex_engine: xelate
+    extra_dependencies: [booktabs]
+  html_document:
+    html_document: null
+    toc: true
+    toc_float: true
+    theme: cosmo
+  word_document:
+    toc: true
+header-includes:
+  - \usepackage{float}
+  - \setlength{\abovecaptionskip}{0pt}
+  - \setlength{\belowcaptionskip}{0pt}
+  - \setlength{\textfloatsep}{0pt}
+  - \setlength{\floatsep}{0pt}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(
+  fig.width = 7,        
+  fig.height = 4.5,
+  out.width = "90%",    
+  fig.align = "center", 
+  fig.pos = "H"       
+)
+knitr::opts_chunk$set(
+  message = FALSE,   
+  warning = FALSE    
+)
+```
+# INTRODUCTION
+
+Dans cette troisième partie, nous reprenons le tableau de contingence construit et analysé manuellement dans la Partie 2 et nous procédons à sa mise en œuvre numérique à l’aide du logiciel R. L’objectif est de vérifier les résultats obtenus précédemment, puis de réaliser l’AFC.
+```{r}
+if(!require(FactoMineR)){install.packages("FactoMineR")}
+if(!require(factoextra)){install.packages("factoextra")}
+if(!require(ggplot2)){install.packages("ggplot2")}
+if(!require(dplyr)){install.packages("dplyr")}
+if(!require(tidyr)){install.packages("tidyr")}
+library(FactoMineR)
+library(factoextra)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+library(latex2exp)
+```
+# IMPLEMENTATION DE L'AFC
+
+## Matrice des effectifs & Matrice des fréquences
+```{r}
+T <- matrix(c(37, 14, 51,
+              52, 15, 44,
+              33, 15, 63,
+              6,  1,  8),
+            nrow = 4, byrow = TRUE)
+
+rownames(T) <- c("Marié", "Marié avec enfants", "Célibataire", "Célibataire avec enfants")
+colnames(T) <- c("Américain", "Européen", "Japonais")
+
+k <- sum(T)
+F <- T / k
+
+kable(T,
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Tableau des effectifs observés")%>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(F, 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Tableau des fréquences")%>%
+  kableExtra::kable_styling(font_size = 9)
+```
+
+
+
+
+
+
+## Profils-lignes & Profils-colonnes & Profil moyen
+```{r}
+profils_lignes <- F 
+for(i in 1:nrow(F)){
+  profils_lignes[i, ] <- F[i, ] / sum(F[i, ])
+}
+
+profils_colonnes <- F
+for(j in 1:ncol(F)){
+  profils_colonnes[, j] <- F[, j] / sum(F[, j])
+}
+
+profil_moyen <- colSums(F)
+
+kable(round(profils_lignes, 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Profils-lignes")%>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(profils_colonnes, 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Profils-colonnes")%>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(as.data.frame(t(profil_moyen)), 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Profil moyen")%>%
+  kableExtra::kable_styling(font_size = 9)
+```
+## Modèle d'indépendance et Statistique Chi2
+```{r}
+marge_lignes <- rowSums(F)
+marge_colonnes <- colSums(F)
+
+F_chapeau <- marge_lignes %o% marge_colonnes 
+
+T_chapeau <- k * F_chapeau
+
+residus <- T - T_chapeau
+
+chi2 <- sum((T - T_chapeau)^2 / T_chapeau)
+
+phi2 <- chi2/k
+
+kable(round(T_chapeau, 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Matrice sous indépendance")%>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(residus, 3),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Résidus")%>%
+  kableExtra::kable_styling(font_size = 9)
+
+cat("La statistique de Chi2 vaut : ", round(chi2, 3), "\n\n")
+
+cat("L'inertie totale phi2 vaut : ", round(phi2, 5), "\n\n")
+
+```
+## Réduction dimensionnelle
+```{r}
+S <- F - F_chapeau 
+
+Z <- S / sqrt(marge_lignes %o% marge_colonnes)
+
+sv <- svd(Z)
+U <- sv$u
+D <- sv$d 
+V <- sv$v
+
+lambda <- D^2
+inertie <- lambda / sum(lambda)
+inertie_cumul <- cumsum(inertie)
+
+Dn_inv_sqrt <- diag(1 / sqrt(marge_lignes))
+Dp_inv_sqrt <- diag(1 / sqrt(marge_colonnes))
+
+coord_lignes <- Dn_inv_sqrt %*% U %*% diag(D)
+coord_colonnes <- Dp_inv_sqrt %*% V %*% diag(D)
+
+rownames(coord_lignes) <- rownames(T)
+rownames(coord_colonnes) <- colnames(T)
+colnames(coord_lignes) <- paste0("Dim", 1:ncol(coord_lignes))
+colnames(coord_colonnes) <- paste0("Dim", 1:ncol(coord_colonnes))
+
+kable(round(Z, 4),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Matrice Z (écarts standardisés)") %>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(cbind(
+  Valeur_singulière = round(D, 4),
+  Lambda = round(lambda, 4),
+  `Part (%)` = round(100*inertie, 2),
+  `Cumul (%)` = round(100*inertie_cumul, 2)
+), format = "latex", booktabs = TRUE, longtable = TRUE,
+caption = "Inerties associées aux axes") %>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(coord_lignes, 4),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Coordonnées factorielles des lignes") %>%
+  kableExtra::kable_styling(font_size = 9)
+
+kable(round(coord_colonnes, 4),
+      format = "latex",
+      booktabs = TRUE,
+      longtable = TRUE,
+      caption = "Coordonnées factorielles des colonnes") %>%
+  kableExtra::kable_styling(font_size = 9)
+
+```
+## Carte factorielle
+```{r}
+afc <- CA(T, graph = FALSE)
+
+fviz_ca_biplot(
+  afc,
+  repel = TRUE,
+  col.row = "#1F77B4",   # bleu doux
+  col.col = "#D62728",   # rouge doux
+  title = "Carte factorielle : profils-lignes et profils-colonnes"
+) + 
+  theme_minimal()
+```
+# INTERPRETATION DES RESULTATS
+
+  (a) Association globale. À l’aide du χ2 et de l’inertie totale Φ2, la situation familiale et
+ l’origine de l’automobile sont-elles indépendantes? Justifiez.
+ 
+ La valeur calculée de chi2 est modérée, et l'inertie totale est faible (d'environ 2,5%), ce qui nous indique que les fréquences observées diffèrent peu de celles prévues sous l'hypothèse d'indépendance. Ainsi, la situation familiale et l’origine de l’automobile peuvent être considérées comme quasi indépendantes, et l’association entre les deux variables, bien que présente, est faible.
+ 
+
+  b) Proximité avec le profil moyen. Quels profils-lignes se rapprochent le plus du profil
+ moyen (marge colonnes)? Lesquels s’en écartent le plus?
+
+Le profil Marié est celui qui se rapproche le plus du profil moyen, avec des proportions très proches pour les trois origines automobiles. Les célibataires et les célibataires avec enfants s’en écartent davantage. Ils présentent une préférence plus forte pour les voitures japonaises, et pour les célibataires avec enfants, d’une part plus faible de voitures européennes. À l’inverse, les mariés avec enfants se distinguent par une proportion plus importante de voitures américaines.
+Ainsi, les écarts au profil moyen révèlent des comportements automobiles différenciés selon la situation familiale.
+
+
+  (c) Qualité de représentation. Pour chaque modalité (au moins deux lignes et deux colonnes),
+ indiquez la qualité de représentation (cos2) sur le plan factoriel.
+```{r}
+cos2_lignes <- afc$row$cos2
+cos2_colonnes <- afc$col$cos2
+
+kable(round(cos2_lignes, 3),
+      format = "latex", booktabs = TRUE, longtable = TRUE,
+      caption = "Qualité de représentation (cos²) des profils-lignes") %>%
+  kable_styling(font_size = 9)
+
+kable(round(cos2_colonnes, 3),
+      format = "latex", booktabs = TRUE, longtable = TRUE,
+      caption = "Qualité de représentation (cos²) des profils-colonnes") %>%
+  kable_styling(font_size = 9)
+```
+Pour les profils-lignes, les modalités « Marié avec enfants » et « Célibataire » présentent des cos² élevés sur la Dim 1 de respectivement 0,999 et 0,998. Elles sont donc bien représentées par cet axe. Leur position sur le plan factoriel est fiable et leur interprétation peut être faite sans ambiguïté.À l’inverse, la modalité « Célibataire avec enfants » est bien représentée par la Dim 2 avec un cos² = 0,995 mais très mal sur la Dim 1. Cela signifie que sa singularité s’exprime surtout sur le second axe.
+Pour les profils-colonnes, la modalité « Européen » est représentée exclusivement sur l’axe 2 (cos² = 1,000), tandis que « Américain » et « Japonais » sont presque entièrement expliqués par l’axe 1 (cos² = 0,992 et 0,987).
+
+
+  (d) Contributions aux axes. Quelles modalités (lignes ou colonnes) contribuent le plus à la
+ construction des deux premiers axes?
+
+L’analyse des contributions montre que le premier axe factoriel est principalement structuré par les modalités « Marié », « Marié avec enfants » et « Célibataire », dont la qualité de représentation sur cet axe est élevée. Du côté des colonnes, les origines « Américain » et « Japonais » contribuent également à la construction de l’axe 1.
+À l’inverse, le second axe est surtout construit par la modalité « Célibataire avec enfants », qui y est très bien représentée, ainsi que par l’origine « Européen », dont la contribution est quasiment exclusive à cet axe.
+
+
+  (e) Comparaison de profils. Quelles deux situations familiales présentent les profils-lignes les
+ plus similaires? (Indice : distance du khi-deux entre profils-lignes.)
+
+Parmi les quatre situations familiales, les profils-lignes « Marié » et « Marié avec enfants » sont ceux qui se ressemblent le plus. Leurs distributions respectives par origine automobile sont très proches, avec des proportions similaires de voitures américaines, européennes et japonaises. La distance du khi-deux entre ces deux profils est donc faible, ce qui indique qu’ils suivent un comportement d’achat comparable.
