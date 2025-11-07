@@ -1,44 +1,17 @@
 if (!require(readxl)) install.packages("readxl")
 library(readxl)
+library(FactoMineR)
 
+data <- read_excel("PCA/TP4_covC1234_DS19_20.xlsx", sheet = 1)
+boxplot(data[,2:15],
+        main = "Boxplots des 14 premières variables quantitatives")
 
-data <- read_excel("TP4_covC1234_DS19_20.xlsx", sheet = 1)
-
-boxplot(data[,1:14],
-        main = "Boxplots des 6 premières variables quantitatives")
-
+data <- data[, -which(names(data) == "indice")]
+# Pour voir seulement les colonnes 1 à 15
+v<- data[rowSums(data == 0, na.rm = TRUE) > 0, 1:15]
 data[data == 0] <- NA
+#On remplace les données 0 par des NA. Qaund c'est 0
 data <- data[data$TYPE != "?", ]
-
-# Remplacement des outliers par la mediane
-
-for (col in names(data)) {
-  
-  # Vérifier si la colonne est numérique
-  if (is.numeric(data[[col]])) {
-    
-    # Calculer les quartiles et l'IQR
-    q1 <- quantile(data[[col]], 0.25, na.rm = TRUE)
-    q3 <- quantile(data[[col]], 0.75, na.rm = TRUE)
-    iqr <- q3 - q1
-    
-    # Définir les bornes des valeurs normales
-    borne_inf <- q1 - 1.5 * iqr
-    borne_sup <- q3 + 1.5 * iqr
-    
-    # Trouver les indices des outliers
-    outliers <- which(data[[col]] < borne_inf | data[[col]] > borne_sup)
-    
-    # Calculer la médiane sans les outliers
-    median_sans_outliers <- median(data[[col]][-outliers], na.rm = TRUE)
-    
-    # Remplacer les outliers par cette médiane
-    data[[col]][outliers] <- median_sans_outliers
-  }
-}
-
-boxplot(data[,1:14],
-        main = "Boxplots des 6 premières variables quantitatives")
 
 sum(is.na(data))
 
@@ -58,8 +31,7 @@ heatmap(cor_matrix,
         margins = c(8,8),
         main = "Matrice de corrélation")
 
-
-
+pairs(data_num)
 
 #regression pour les valeurs manquantes
 
@@ -94,7 +66,7 @@ for (col in names(data_num)) {
     
     # Créer le sous-ensemble de prédiction
     data_predict <- data_num[idx_na, vars_predict]
-    
+    #avant de prédire on va valider le modèle de régression linéaire
     # Prédire et remplacer les valeurs manquantes
     data_num[[col]][idx_na] <- predict(model, newdata = data_predict)
   }
@@ -120,8 +92,8 @@ data$SAISON <- as.factor(data$SAISON)
 data$TYPE <- as.factor(data$TYPE)
 
 # série de tableau et boxplot pour inspection préliminaire
-
-
+data$Campagne<- as.factor(data$Campagne)
+data$Localisation <- as.factor(data$Localisation)
 # Tableau croisé simple
 table(data$SAISON, data$TYPE)
 
@@ -158,9 +130,6 @@ heatmap(cor(data_num, use = "pairwise.complete.obs"),
 X <- data_num   
 dim(X)
 
-
-if(!require(FactoMineR)) install.packages("FactoMineR")
-library(FactoMineR)
 
 # 2. Réaliser l’ACP sur les variables numériques
 res <- PCA(data, 

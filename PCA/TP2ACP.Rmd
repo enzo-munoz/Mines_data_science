@@ -1,0 +1,552 @@
+---
+title: "TP2ACP"
+output: html_document
+---
+```{r}
+if (!require(readxl)) install.packages("readxl")
+library(readxl)
+library(FactoMineR)
+```
+
+```{r}
+data <- read_excel("TP4_covC1234_DS19_20.xlsx", sheet = 1)
+boxplot(data[,2:15],
+        main = "Boxplots des 14 premières variables quantitatives")
+
+data <- data[, -which(names(data) == "indice")]
+```
+Le box plot nous montre des valeurs atypiques. Notament 2 pour BTM, une pour X, 1 pour 10_ane, 1 pour E 
+
+
+```{r}
+# à partir du boxplot on a vu quelques valeurs atypiques 
+trouver_lignes_atypiques <- function(df, nom_colonne) {
+  
+  colonne <- df[[nom_colonne]]
+  
+  valeurs_atypiques <- boxplot.stats(colonne)$out
+  
+  if (length(valeurs_atypiques) > 0) {
+    
+    indices_lignes <- which(colonne %in% valeurs_atypiques)
+    print(df[indices_lignes, ])
+    
+  } else {
+    
+    cat(paste("\n--- Pas de donnée atypique trouvée pour '", nom_colonne, "' ---\n", sep=""))
+  }
+}
+
+
+set.seed(42)
+trouver_lignes_atypiques(data, "BTM")
+trouver_lignes_atypiques(data, "X")
+trouver_lignes_atypiques(data, "10_ane") 
+trouver_lignes_atypiques(data, "E")
+```
+
+On remarque que pour les données un peu atypique on a un facteur commun qui est le fait que ce soit en campagne CA2 pour la plupart qu'elles sont là. Il faudrait connaître plus d'information sur les conditions dans lesquelles ont été mené ces campagnes. 
+
+
+
+
+```{r}
+# 1. Identification des colonnes numériques
+colonnes_numeriques <- names(data)[sapply(data, is.numeric)]
+
+# 2. Boucle pour créer les boxplots
+par(mfrow = c(2, 2)) # Ajuster les paramètres graphiques pour afficher 4 graphiques par page (ajustez si besoin)
+
+for (var in colonnes_numeriques) {
+  # Création du boxplot de base R
+  boxplot(
+    data[[var]] ~ data$Campagne, # Syntaxe formule: Y ~ X
+    main = paste("Boxplot de", var, "par Campagne"),
+    xlab = "Campagne",
+    ylab = var,
+    col = c("lightblue", "lightcoral", "lightgreen") # Couleurs des boîtes
+  )
+}
+
+par(mfrow = c(1, 1)) # Réinitialiser les paramètres graphiques
+```
+
+On voit donc bien qu'en fonction de la campagne on obtient pas la même distribution dans nos capteurs chimiques et que la campagne CA2 est la campagne avec la plus grande variance et des valeurs globalement plus haute au niveau des capteurs chimiques. 
+
+```{r}
+
+type_eroor<- data[which(data$TYPE == "?"), ]
+type_eroor
+
+loc<- data[which(data$Localisation == "P10"), ]
+loc
+loc1<- data[which(data$Localisation == "P22"), ]
+loc1
+data <- data[data$Localisation != "P22", ]
+data$TYPE[data$TYPE == "?"] <- "sourceindustrie"
+```
+
+
+On a remarqué que dans les données certaines valeurs de type sont des "?" qui signifie un manque d'information sur le type. On compare pour les types des localisations où s'est produit l'anomalie. Pour la localisation P10 tous les types sont sourceindustrie. On a d'autant plus remarqué que pour toutes les localisations on associe qu'un seul type parmi (Rural, urbain, compostage...). On peut donc légitimement imputer le type sourceindustrie. 
+
+
+Pour la localisation P22, on a pas d'autres localisation P22
+
+
+```{r}
+data_num <- data[, sapply(data, is.numeric)]
+loc1_num <- loc1[, sapply(loc1, is.numeric)]
+
+par(mfrow = c(3, 4))
+for (col in names(data_num)) {
+  boxplot(data_num[[col]], main = col, col = "lightblue")
+  points(1, loc1_num[[col]], col = "red", pch = 19, cex = 2)
+}
+
+
+```
+Même si on voit que les valeurs captées sont à la localisation P22 sont proches des médianes des distributions dans chaque catégorie pour une même campagne. Le fait de ne pas avoir d'autre localisation et surtout pas de type ne sert pas à répondre aux questions évoquer en introduction à part pour la différence entre les campagnes d'hiver et d'été mais ppur le coup supprimer une ligne ne pose pas de problème.  
+
+```{r}
+v<- data[rowSums(data == 0, na.rm = TRUE) > 0, 1:15]
+data[data == 0] <- NA
+#On remplace les données 0 par des NA. Qaund c'est 0
+```
+ 
+Les valeurs nuls sont considérés comme des valeurs manquantes, en effet la concentration de COV n’est jamais nulle là où il y a du vivant. On en a trouvé 31 sur 138 observations. 
+```{r}
+#Matrice de correlation
+
+data_num <- data[, sapply(data, is.numeric)]
+data_qual <- data[, !sapply(data, is.numeric)]
+
+names(data_num) <- make.names(names(data_num))
+
+cor_matrix <- cor(data_num, use = "pairwise.complete.obs")
+
+heatmap(cor_matrix,
+        Colv = NA, Rowv = NA,           
+        col = colorRampPalette(c("blue", "white", "red"))(20),
+        scale = "none", 
+        margins = c(8,8),
+        main = "Matrice de corrélation")
+```
+
+
+```{r}
+pairs(data_num)
+```
+
+L'information sur la relation entre les deux variables est bien présente des deux côtés de la diagonale, mais les graphiques eux-mêmes sont des "miroirs" avec les axes permutés.
+Certaines variables ont l'air d'être fortement corrélé. (Exemple : presque une droite entre K13_ane et K14_ane). 
+Par la suite on va vouloir faire des régressions pour prédire les valeurs des variables manquantes. 
+
+Notre point de vue est de trouvé les variables qui expliquent le plus la variable manquante mais attention pour valider notre modèle de régression simple il ne faut pas de colinéarité entre les variables qui servent à prédire sinon les prédicteurs auront des erreurs standard importantes à moins d'utiliser des techniques de régression linéaire avancé de type ridge.    
+
+```{r}
+na_percent <- sapply(data_num, function(x) sum(is.na(x)) / length(x) * 100)
+sort(na_percent, decreasing = TRUE)
+```
+
+
+Faut-il enlever la colonne NonaDecanonic ? 
+On a choisi que non car potentiellement ça peut être une variable très explicative et qui nous serve plus tard. 
+
+
+Nous avons commencé les régressions avancées avec Xavier Bay. J’ai donc au départ pour m'exercer choisi d’expérimenter la régression Ridge, car certaines variables présentent de la corrélation entre elles.
+L’objectif ici est de prédire les valeurs manquantes. On procède en partant des colonnes dont le taux de valeurs manquantes est le plus faible, puis on ajuste un modèle de régression linéaire Ridge à partir des observations complètes, en intégrant également les variables catégorielles.
+
+Typiquement, l’ajout de ces variables factorielles revient à introduire un coefficient γ (gamma) : par exemple, si l’individu i est observé en hiver, alors γ = 1, sinon γ = 0. Cette codification (appelée one-hot encoding) multiplie le nombre de variables par le nombre de modalités des facteurs.
+
+Dans ce contexte, il est donc possible que le nombre de prédicteurs p dépasse le nombre d’observations n, ce qui motive l’utilisation d’une régression Lasso, plus adaptée à ce type de situation.
+
+Enfin, certaines lignes présentent plusieurs valeurs manquantes simultanément. Dans ces cas-là, la prédiction n’est pas possible ; la valeur manquante est alors remplacée par la médiane de la colonne correspondante.
+
+Je base mon critère pour valider mon modèles sur le calcul du R² avec un seuil de 0.5 en dessous duquelle c'est la valeur de la colonne qui est imputé. J'aurais pu imputé la médiane des données de même localisation mais au vu du fait que le TP est sur l'ACP, je n'ai pas voulu rajouter de travail sur cette partie. 
+```{r}
+library(glmnet)
+# Définir les variables catégorielles
+vars_categoriques <- c("TYPE", "Campagne", "SAISON", "Localisation")
+
+# Vérifier qu'elles existent dans le dataset
+vars_categoriques <- vars_categoriques[vars_categoriques %in% names(data)]
+
+# Convertir ces colonnes en facteurs
+data[vars_categoriques] <- lapply(data[vars_categoriques], as.factor)
+
+# Séparer les variables numériques et catégorielles
+data_cat <- data[, names(data) %in% vars_categoriques, drop = FALSE]
+data_num <- data[, sapply(data, is.numeric), drop = FALSE]
+
+# Éviter d'utiliser au fur et à mesure les valeurs prédites
+# On garde une copie des données complètes pour l'entraînement
+idx_train <- complete.cases(data_num)
+cat("Nombre de lignes complètes pour l'entraînement :", sum(idx_train), "/", nrow(data_num), "\n\n")
+
+# Trier les colonnes par nombre de NA croissant
+na_counts <- sapply(data_num, function(x) sum(is.na(x)))
+col_order <- names(sort(na_counts))
+
+# Tableau récapitulatif des résultats
+results <- data.frame(
+  Variable = character(),
+  NA_percent = numeric(),
+  Best_Lambda = numeric(),
+  MSE = numeric(),
+  R2 = numeric(),
+  Method = character(),
+  stringsAsFactors = FALSE
+)
+
+cat("=== IMPUTATION PAR RÉGRESSION RIDGE AVEC VARIABLES CATÉGORIELLES ===\n\n")
+
+for (col in col_order) {
+  
+  # Ignorer les colonnes sans NA
+  if (!any(is.na(data_num[[col]]))) {
+    next
+  }
+  
+  na_pct <- sum(is.na(data_num[[col]])) / nrow(data_num) * 100
+  cat("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+  cat("Variable :", col, sprintf("(%.1f%% de NA)", na_pct), "\n")
+  cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+  
+  vars_num_predict <- setdiff(names(data_num), col)
+  
+  # Créer y_train et X_train_num à partir des lignes complètes
+  y_train_all <- data_num[[col]][idx_train]
+  X_train_num <- as.matrix(data_num[idx_train, vars_num_predict])
+  
+  # Ajouter les variables catégorielles (one-hot encoding)
+  X_train_cat <- model.matrix(~ . - 1, data = data_cat[idx_train, , drop = FALSE])
+  
+  # Combiner numériques + catégorielles
+  X_train <- cbind(X_train_num, X_train_cat)
+  
+  
+  cat("Dimensions de X_train : n =", nrow(X_train), ", p =", ncol(X_train), "\n")
+  
+  # Si p > n, informer l'utilisateur (situation haute dimensionnalité)
+  if (ncol(X_train) > nrow(X_train)) {
+    cat("⚠️  p > n (", ncol(X_train), ">", nrow(X_train), 
+        ") : situation haute dimensionnalité\n")
+  }
+  
+  # Cross-validation pour trouver le meilleur lambda
+  set.seed(123)
+  cv_ridge <- cv.glmnet(X_train, y_train_all, alpha = 0, nfolds = 10, type.measure = "mse")
+  
+  best_lambda <- cv_ridge$lambda.min
+  min_mse <- min(cv_ridge$cvm)
+  
+  # Entraîner le modèle final avec le meilleur lambda
+  ridge_model <- glmnet(X_train, y_train_all, alpha = 0, lambda = best_lambda)
+  
+    # Prédictions sur l'ensemble d'entraînement
+  y_pred_train <- as.vector(predict(ridge_model, newx = X_train, s = best_lambda))
+  
+  # R² classique
+  ss_res <- sum((y_train_all - y_pred_train)^2)
+  ss_tot <- sum((y_train_all - mean(y_train_all))^2)
+  r2 <- 1 - (ss_res / ss_tot)
+  
+  # R² ajusté
+  n <- nrow(X_train)
+  p <- ncol(X_train)
+  r2_adj <- 1 - (1 - r2) * (n - 1) / (n - p - 1)
+  
+  cat("R² ajusté :", round(r2_adj, 4), "\n")
+
+  
+  cat("✓ Meilleur λ :", sprintf("%.6f", best_lambda), "\n")
+  cat("✓ MSE (CV)   :", sprintf("%.4f", min_mse), "\n")
+  cat("✓ R²         :", sprintf("%.4f", r2), "\n")
+  
+  # Vérifier le seuil R² = 0.5
+  if (r2_adj < 0.4) {
+    cat("⚠️  R² < 0.5 → Imputation par médiane (modèle non validé)\n")
+    median_val <- median(data_num[[col]], na.rm = TRUE)
+    idx_na <- which(is.na(data_num[[col]]))
+    data_num[[col]][idx_na] <- median_val
+    
+    results <- rbind(results, data.frame(
+      Variable = col,
+      NA_percent = na_pct,
+      Best_Lambda = best_lambda,
+      MSE = min_mse,
+      R2 = r2,
+      R2_adj = r2_adj,
+      Method = "Mediane (R² < 0.5)"
+    ))
+    
+    cat("✓", length(idx_na), "valeurs imputées par la médiane\n")
+    next
+  }
+  # Identifier les lignes à prédire
+  idx_na <- which(is.na(data_num[[col]]))
+  if (length(idx_na) > 0) {
+    
+    cat("\n--- Prédiction pour", length(idx_na), "ligne(s) manquante(s) de", col, "---\n")
+    
+    # Créer un sous-ensemble complet (num + cat)
+    data_pred <- cbind(data_num[idx_na, vars_num_predict, drop = FALSE],
+                       data_cat[idx_na, , drop = FALSE])
+    # Cas particulier : une seule ligne
+    if (nrow(data_pred) == 1) {
+      # S'assurer que les facteurs ont les mêmes niveaux que ceux du train
+      for (v in names(data_cat)) {
+        data_pred[[v]] <- factor(data_pred[[v]], levels = levels(data_cat[[v]]))
+      }
+    }
+    
+    # Créer X_predict avec toutes les colonnes (num + cat encodées)
+    X_predict <- model.matrix(~ . - 1, data = data_pred)
+    
+    missing_cols <- setdiff(colnames(X_train), colnames(X_predict))
+    if (length(missing_cols) > 0) {
+      zero_mat <- matrix(0, nrow = nrow(X_predict), ncol = length(missing_cols))
+      colnames(zero_mat) <- missing_cols
+      X_predict <- cbind(X_predict, zero_mat)
+    }
+    X_predict <- X_predict[, colnames(X_train)]
+    # Forcer une matrice si une seule ligne
+    if (is.null(dim(X_predict))) {
+      X_predict <- matrix(X_predict, nrow = 1)
+      colnames(X_predict) <- names(X_predict)  # récupérer les noms de colonnes
+    }
+    
+    print(X_predict)
+    print(dim(X_predict))  # maintenant lignes × colonnes
+    
+    # Imputation des NA par la médiane
+    for (j in 1:ncol(X_predict)) {
+      na_idx_pred <- is.na(X_predict[, j])
+      if (any(na_idx_pred)) {
+        col_mediane <- median(X_train[, j], na.rm = TRUE)
+        X_predict[na_idx_pred, j] <- col_mediane
+      }
+    }
+
+    
+    predictions <- as.vector(predict(ridge_model, newx = X_predict, s = best_lambda))
+    data_num[[col]][idx_na] <- predictions
+    
+    cat("✓", length(idx_na), "valeurs imputées par le modèle Ridge\n")
+  }
+
+
+
+  
+  # Stocker les résultats
+  results <- rbind(results, data.frame(
+    Variable = col,
+    NA_percent = na_pct,
+    Best_Lambda = best_lambda,
+    MSE = min_mse,
+    R2 = r2,
+    R2_adj = r2_adj, 
+    Method = "Ridge"
+  ))
+  
+  # Visualisation de la courbe MSE vs Lambda
+  plot(cv_ridge, main = paste("Cross-Validation Ridge:", col))
+  abline(v = log(best_lambda), col = "red", lwd = 2, lty = 2)
+  legend("topright", 
+         legend = c(paste("λ =", round(best_lambda, 6)),
+                    paste("MSE =", round(min_mse, 4)),
+                    paste("R² =", round(r2, 4))),
+         bty = "n", cex = 0.9)
+}
+
+cat("\n\n=== RÉSUMÉ DES PERFORMANCES ===\n")
+print(results)
+
+# Visualisation finale
+par(mfrow = c(1, 2))
+
+# R² par variable
+barplot(results$R2_adj[!is.na(results$R2_adj)], 
+        names.arg = results$Variable[!is.na(results$R2)], 
+        las = 2, 
+        col = ifelse(results$R2_adj[!is.na(results$R2_adj)] >= 0.5, "darkgreen", "red"),
+        main = "R² ajusté par variable",
+        ylab = "R² ajusté",
+        ylim = c(0, 1))
+abline(h = 0.5, col = "blue", lwd = 2, lty = 2)
+text(x = 1, y = 0.55, "Seuil 0.5", col = "blue", pos = 4)
+
+# MSE par variable
+barplot(results$MSE[!is.na(results$MSE)], 
+        names.arg = results$Variable[!is.na(results$MSE)], 
+        las = 2, 
+        col = "steelblue",
+        main = "MSE (CV) par variable",
+        ylab = "MSE")
+
+par(mfrow = c(1, 1))
+
+cat("\n✅ Imputation terminée !\n")
+cat("Note : Les variables catégorielles (TYPE, Campagne, SAISON, Localisation)\n")
+cat("       ont été intégrées via one-hot encoding (γ = 1 si modalité présente, 0 sinon)\n")
+cat("       Seules les lignes complètes ont été utilisées pour l'entraînement\n")
+```
+
+
+```{r}
+data <- cbind(data_num, data_cat)
+
+colSums(is.na(data))
+```
+
+
+```{r}
+table(data$SAISON, data$TYPE)
+```
+
+
+```{r}
+prop.table(table(data$SAISON, data$TYPE))
+```
+
+
+```{r}
+boxplot(BTM ~ SAISON, data = data,
+        main = "Concentration de BTM selon la saison",
+        xlab = "Saison", ylab = "BTM",
+        col = c("skyblue", "lightcoral"))
+```
+
+
+```{r}
+boxplot(Tot_OcNoDecana ~ TYPE, data = data,
+        main = "Tot_OcNoDecana selon le type d'environnement",
+        xlab = "Type d'environnement", ylab = "Tot_OcNoDecana",
+        col = c("lightgreen", "gold", "lightblue"))
+```
+
+
+```{r}
+moyennes_saison <- aggregate(data_num, by = list(SAISON = data$SAISON), mean)
+
+# Préparer la zone de plot pour afficher plusieurs graphiques
+# Ajustez le nombre dans c(X, Y) en fonction du nombre de variables dans data_num
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1)) 
+
+# Boucle pour générer un bar plot pour chaque variable
+for (i in 2:ncol(moyennes_saison)) {
+  variable_name <- names(moyennes_saison)[i]
+  
+  barplot(
+    height = moyennes_saison[, i],
+    names.arg = moyennes_saison$SAISON,
+    main = paste("Moyenne de", variable_name, "par Saison"),
+    ylab = paste("Moyenne de", variable_name),
+    xlab = "Saison",
+    col = rainbow(length(moyennes_saison$SAISON))
+  )
+}
+
+# Réinitialiser les paramètres graphiques
+par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+```
+
+
+```{r}
+# Corrélation entre variables (vue rapide)
+heatmap(cor(data_num, use = "pairwise.complete.obs"),
+        Colv = NA, Rowv = NA,
+        col = colorRampPalette(c("blue", "white", "red"))(20),
+        main = "Corrélations entre composés chimiques")
+
+# creation de la matrice X , on va normaliser car les grandeurs de nos données ont des unités et ordres de grandeurs differentes
+```
+
+
+Il est important de faire la normalisation des données pour éviter la sur-domination des variables à grande variance, par exemple : Tot_OcNoDecana ayant pour 3Q - 1Q = 560 >> B avec 3Q - 1Q = 71. J'ai donc scale de manière linéaire toutes les variables.
+
+```{r}
+coords <- res$ind$coord
+
+idx_max_dim1 <- which.max(coords[, 1])
+print(paste("Individu avec le max sur Dim.1 (Index):", idx_max_dim1))
+print("Ses coordonnées (Dim.1 et Dim.2) sont :")
+print(coords[idx_max_dim1, 1:2])
+idx_min_dim2 <- which.min(coords[, 2])
+print(paste("Individu avec le min sur Dim.2 (Index):", idx_min_dim2))
+print("Ses coordonnées (Dim.1 et Dim.2) sont :")
+print(coords[idx_min_dim2, 1:2])
+
+nb_col_num <- ncol(data_num)
+nb_col_total <- ncol(data)
+indices_quali <- (nb_col_num + 1):nb_col_total
+
+print("Indices des variables qualitatives :")
+print(indices_quali)
+print("Noms de ces variables :")
+print(colnames(data)[indices_quali])
+data <- data[-idx_max_dim1, ]
+res_correct <- PCA(data,
+                   scale.unit = TRUE,   
+                   quali.sup = indices_quali, 
+                   ncp = 5,             
+                   graph = FALSE)       
+
+summary(res_correct)
+
+# Plan factoriel des individus (PROPRE)
+plot.PCA(res_correct, 
+         choix = "ind", 
+         label = "quali",  
+         title = "Projection (corrigée) des individus sur le plan (1,2)")
+
+plot.PCA(res_correct, choix = "ind", 
+       habillage = "SAISON",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
+
+plot.PCA(res_correct, choix = "ind", 
+         habillage = "TYPE",
+        label = "quali", cex = 0.8,
+         title = "Individus colorés selon le type d'environnement")
+
+# Cercle des corrélations (ne change pas)
+plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des variables")
+```
+
+```{r}
+summary(data_num)
+X <- scale(data_num, center = TRUE, scale = TRUE)
+data<- cbind(X, data_cat)
+summary(X)
+
+res <- PCA(X, 
+           quali.sup = 1:4,  
+           scale.unit = TRUE,
+           graph = TRUE)
+
+
+summary(res)
+```
+
+
+```{r}
+barplot(res$eig[,2],
+        names.arg = 1:nrow(res$eig),
+        main = "Pourcentage de variance expliquée par composante",
+        xlab = "Composante principale",
+        ylab = "Variance expliquée (%)",
+        col = "skyblue")
+
+#Cumul des variances expliquées ===
+plot(cumsum(res$eig[,2]), type = "b",
+     main = "Cumul de la variance expliquée",
+     xlab = "Nombre de composantes",
+     ylab = "Variance cumulée (%)",
+     col = "red", pch = 19)
+
+# Plan factoriel des individus
+plot.PCA(res, choix = "ind", title = "Projection des individus sur le plan (1,2)")
+
+```
+
