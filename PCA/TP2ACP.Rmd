@@ -473,22 +473,18 @@ On voit que l'individu a été mesuré pendant la campagne CA2, en été qu'on a
 ```{r}
 nb_col_num <- ncol(data_num)
 nb_col_total <- ncol(data)
-indices_quali <- (nb_col_num + 1):nb_col_total
+indices_quali <- (nb_col_num + 1):(nb_col_total - 1)
+#j'enlève localisation. Ce qui compte c'est le type d'environnement.
 
-print("Indices des variables qualitatives :")
-print(indices_quali)
-print("Noms de ces variables :")
-print(colnames(data)[indices_quali])
-
-res_correct <- PCA(data,
+data_no_loc <- subset(data, select = -Localisation)
+res <- PCA(data_no_loc,
                    scale.unit = TRUE,   
                    quali.sup = indices_quali, 
                    ncp = 5,             
                    graph = FALSE)       
 
-summary(res_correct)
 ```
-
+On supprime la variable qualitative de localisation qui nous apporte pas plus d'information par rapport aux type d'environnement. 
 
 ```{r}
 barplot(res$eig[,2],
@@ -505,7 +501,7 @@ plot(cumsum(res$eig[,2]), type = "b",
      ylab = "Variance cumulée (%)",
      col = "red", pch = 19)
 # Cercle des corrélations (ne change pas)
-plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des variables")
+plot.PCA(res, choix = "var", title = "Cercle des corrélations des variables")
 ```
 Pour faire l'ACP on a normalisé les données. Il est important dans ce cas de faire la normalisation des données pour éviter la sur-domination des variables à grande variance, par exemple : Tot_OcNoDecana ayant pour 3Q - 1Q = 560 >> B avec 3Q - 1Q = 71. J'ai donc scale de manière linéaire toutes les variables. En plus on ne sait pas si les valeurs ont les mêmes unités. C'est probablement pas le cas. On a une décroissance de la variance expliquée par les composantes qui décroît de manière exponentielle. Il n'y a pas de cassures. On peut garder les composantes sui ont des valeurs propres supérieurs à 1 ou alors garder les composantes qui en somme dépasse les 90% de variances expliqués cumulé. 
 
@@ -513,7 +509,7 @@ Pour faire l'ACP on a normalisé les données. Il est important dans ce cas de f
 
 ```{r}
 
-plot.PCA(res_correct, choix = "ind", 
+plot.PCA(res, choix = "ind", 
          habillage = "TYPE",
         label = "quali", cex = 0.8,
          title = "Individus colorés selon le type d'environnement")
@@ -521,7 +517,7 @@ plot.PCA(res_correct, choix = "ind",
 ```
 Sur cette représentation de la répartition des données sur les 2 composantes principales. On voit que l'axe des absisses délimite source industrie 80 % en dessous à peu près. Faut-il retirer les point à l'extrémité droite en bas? 
 ```{r}
-plot.PCA(res_correct, choix = "ind", 
+plot.PCA(res, choix = "ind", 
        habillage = "SAISON",
        label = "quali", cex = 0.8,
        title = "Individus colorés selon la saison")
@@ -529,23 +525,35 @@ plot.PCA(res_correct, choix = "ind",
 On voit cette fois une délimitation claire entre été et hiver symbolisé par l'axe des abscisses. L'individu en bas à droite lui semble être mal classé. C'est un indiv d'été alors qu'il est sous la droite des abscisses. On va donc refaire l'ACP en éliminant cette individu. 
 
 ```{r}
-data <- data[-idx_max_dim1, ]
-nb_col_num <- ncol(data_num)
-nb_col_total <- ncol(data)
-indices_quali <- (nb_col_num + 1):nb_col_total
+plot.PCA(res, choix = "ind", 
+       habillage = "Campagne",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
+```
+On observe sur ce graphique que les différentes campagnes se distinguent bien les unes des autres. Cependant, deux individus situés à l’extrémité droite perturbent la lecture globale : ils semblent concentrer une grande part de la variance, ce qui masque la structure générale des autres observations.
+Nous avons donc choisi de les retirer afin de mieux interpréter la variabilité entre les individus « typiques ».
+Cette décision est justifiée par le fait que ces deux points proviennent d’un contexte industriel particulier et présentent des valeurs nettement plus extrêmes que le reste des données.
 
-print("Indices des variables qualitatives :")
-print(indices_quali)
-print("Noms de ces variables :")
-print(colnames(data)[indices_quali])
+```{r}
 
-res_correct <- PCA(data,
+coords <- res$ind$coord
+order_dim2 <- order(coords[, 2])  # du plus petit au plus grand
+idx_min1 <- order_dim2[1]         # minimum
+idx_min2 <- order_dim2[2]         # second minimum
+
+cat("→ Suppression des individus les plus bas sur Dim.2 :", idx_min1, "et", idx_min2, "\n")
+cat("Coordonnées respectives :\n")
+print(coords[c(idx_min1, idx_min2), 1:2])
+
+# Supprimer les deux individus en une seule fois
+data_no_loc <- data_no_loc[-c(idx_min1, idx_min2), ]
+
+res_correct <- PCA(data_no_loc,
                    scale.unit = TRUE,   
                    quali.sup = indices_quali, 
                    ncp = 5,             
                    graph = FALSE)       
 
-summary(res_correct)
 
 
 # Cercle des corrélations (ne change pas)
@@ -557,15 +565,15 @@ plot.PCA(res_correct, choix = "var", title = "Cercle des corrélations des varia
 ```{r}
 
 
-barplot(res$eig[,2],
-        names.arg = 1:nrow(res$eig),
+barplot(res_correct$eig[,2],
+        names.arg = 1:nrow(res_correct$eig),
         main = "Pourcentage de variance expliquée par composante",
         xlab = "Composante principale",
         ylab = "Variance expliquée (%)",
         col = "skyblue")
 
 #Cumul des variances expliquées ===
-plot(cumsum(res$eig[,2]), type = "b",
+plot(cumsum(res_correct$eig[,2]), type = "b",
      main = "Cumul de la variance expliquée",
      xlab = "Nombre de composantes",
      ylab = "Variance cumulée (%)",
@@ -583,5 +591,52 @@ plot.PCA(res_correct, choix = "ind",
        habillage = "TYPE",
        label = "quali", cex = 0.8,
        title = "Individus colorés selon la saison")
+```
+
+On ne voit toujours pas vraiment les catégories qui se dégage dans cette configuration. 
+```{r}
+plot.PCA(res_correct, choix = "ind", 
+       habillage = "Campagne",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés selon la saison")
+```
+On voit encore mieux cette séparation des campagnes après avoir enlever 2 données 
+
+Comme les saisons ont déjà bien été séparé. On va s'interreser aux autres en séparant par saison. 
+
+```{r}
+data_hiver <- data_no_loc[data_no_loc$SAISON == "hiver", ]
+data_ete   <- data_no_loc[data_no_loc$SAISON == "été", ]
+
+res_hiver <- PCA(data_hiver, scale.unit = TRUE, quali.sup = indices_quali, ncp = 5, graph = FALSE)
+
+res_ete   <- PCA(data_ete,   scale.unit = TRUE, quali.sup = indices_quali, ncp = 5, graph = FALSE)
+
+plot.PCA(res_ete, choix = "ind", 
+       habillage = "TYPE",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés en été")
+
+
+plot.PCA(res_hiver, choix = "ind", 
+       habillage = "TYPE",
+       label = "quali", cex = 0.8,
+       title = "Individus colorés en hiver")
+```
+```{r}
+barplot(res_ete$eig[,2],
+        names.arg = 1:nrow(res_ete$eig),
+        main = "Pourcentage de variance expliquée par composante (valeurs d'été)",
+        xlab = "Composante principale",
+        ylab = "Variance expliquée (%)",
+        col = "skyblue")
+
+barplot(res_hiver$eig[,2],
+        names.arg = 1:nrow(res_ete$eig),
+        main = "Pourcentage de variance expliquée par composante (valeurs d'hiver)",
+        xlab = "Composante principale",
+        ylab = "Variance expliquée (%)",
+        col = "skyblue")
+
 ```
 
