@@ -46,13 +46,13 @@ Analyser et modéliser une série temporelle de températures pour en comprendre
 
 ### 📘 Contenu
 - Exploration et visualisation d’une série temporelle (tendance, saisonnalité, bruit).  
-- Décomposition de la série et identification des composantes principales.  
 - Modélisation et prévision à l’aide de méthodes statistiques (ARIMA, lissage exponentiel, etc.).  
 
 ### 🧠 Compétences acquises
-- Manipulation et transformation de **données chronologiques**.  
-- Identification de tendances et cycles saisonniers.  
-- Évaluation des performances de modèles de prévision.  
+- Identification de tendances et cycles saisonniers.
+- Évaluation des performances de modèles de prévision.
+- Détection d'hétéroscélasticité dans les résidus.
+- Modèle ARCH pour valider le modèle.
 
 ---
 
