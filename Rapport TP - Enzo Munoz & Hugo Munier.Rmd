@@ -1,18 +1,7 @@
 ---
 title: "TP - Clustering & Classification"
-author: "Enzo Munoz - Hugo Munier"
+author: "Hanae Messifet - Enzo Munoz - Hugo Munier"
 date: "2025-11-26"
-output:
-  pdf_document:
-    latex_engine: xelatex
-    keep_tex: true
-  html_document:
-    html_document:
-    toc: true
-    toc_float: true
-    theme: cosmo
-header-includes:
-    - \usepackage{float}
 ---
 
 ```{r setup, include=FALSE}
@@ -30,6 +19,137 @@ knitr::opts_chunk$set(
   warning = FALSE    
 )
 ```
+
+
+```{r}
+
+##Question 1 
+
+##Implémentation de k means
+my_kmeans <- function(x, centers, max_iter = 100, nstart = 10) {
+  x <- as.matrix(x)
+  n <- nrow(x)
+  p <- ncol(x)
+  
+  if (length(centers) == 1) {
+    K <- centers
+  } else {
+    stop("'centers' doit etre un entier (nombre de clusters).")
+  }
+  
+  best_tot_withinss <- Inf
+  best_result <- NULL
+  
+  for (start in 1:nstart) {
+    # 1) Initialisation
+    init_idx <- sample(1:n, K)
+    centroids <- x[init_idx, , drop = FALSE]
+    
+    cluster <- rep(NA_integer_, n)
+    
+    for (iter in 1:max_iter) {
+      # 2) Affectation
+      dists <- as.matrix(dist(rbind(centroids, x)))[1:K, (K+1):(K+n)]
+      new_cluster <- apply(dists, 2, which.min)
+      
+      if (!any(is.na(cluster)) && all(new_cluster == cluster)) break
+      
+      cluster <- new_cluster
+      
+      # 3) centroïdes
+      for (k in 1:K) {
+        if (sum(cluster == k, na.rm = TRUE) == 0) {
+          centroids[k, ] <- x[sample(1:n, 1), ]
+        } else {
+          centroids[k, ] <- colMeans(x[cluster == k, , drop = FALSE])
+        }
+      }
+    }
+    
+    # 4) Sommes des carrés intra cluster
+    tot_withinss <- 0
+    withinss <- numeric(K)
+    for (k in 1:K) {
+      if (sum(cluster == k, na.rm = TRUE) > 0) {
+        diffs <- x[cluster == k, , drop = FALSE] -
+          matrix(centroids[k, ],
+                 nrow = sum(cluster == k, na.rm = TRUE),
+                 ncol = p, byrow = TRUE)
+        ss <- sum(diffs^2)
+        withinss[k] <- ss
+        tot_withinss <- tot_withinss + ss
+      } else {
+        withinss[k] <- NA
+      }
+    }
+    
+    if (tot_withinss < best_tot_withinss) {
+      best_tot_withinss <- tot_withinss
+      best_result <- list(
+        cluster = cluster,
+        centers = centroids,
+        withinss = withinss,
+        tot.withinss = tot_withinss,
+        iter = iter
+      )
+    }
+  }
+  
+  best_result
+}
+
+## test sur données jouets
+set.seed(123)
+n <- 50  
+C1 <- c(0, 0)
+C2 <- c(5, 5)
+C3 <- c(0, 6)
+
+X1 <- cbind(rnorm(n, C1[1], 0.4), rnorm(n, C1[2], 0.4))
+X2 <- cbind(rnorm(n, C2[1], 0.4), rnorm(n, C2[2], 0.4))
+X3 <- cbind(rnorm(n, C3[1], 0.4), rnorm(n, C3[2], 0.4))
+
+X_jouets <- rbind(X1, X2, X3)
+colnames(X_jouets) <- c("x1", "x2")
+true_labels <- factor(rep(1:3, each = n))
+
+plot(X_jouets, col = true_labels, pch = 19,
+     main = "Données jouets : 3 clusters séparés",
+     xlab = "x1", ylab = "x2")
+legend("topleft", legend = c("Cluster 1", "Cluster 2", "Cluster 3"),
+       col = 1:3, pch = 19)
+
+# pour tester sur jeu de données + compliqué
+diab <- read.csv("dataset_diabetes (1).csv", header = TRUE, sep = ",")
+diab$class <- factor(diab$class)
+X_diab <- diab[, 1:8]
+y_diab <- diab$class
+
+X_diab_scaled <- scale(X_diab)
+set.seed(123)
+
+res_my_diab <- my_kmeans(X_diab_scaled, centers = 2, nstart = 20)
+cat("Comparaison TRUE vs my_kmeans :\n")
+table(True = y_diab, MyKmeans = res_my_diab$cluster)
+
+##Interpretation : le cluster 1 contient surtout des positif et le cluster 2 des négatifs
+correct <- 148 + 371
+accuracy <- correct / 768
+accuracy
+## Ici, k-means avec K = 2 retrouve à peu près 68% des classes dans notre jeu de données 
+
+##Comparaison avec la fonction kmeans de R 
+set.seed(123)
+res_r_diab <- kmeans(X_diab_scaled, centers = 2, nstart = 20)
+table(True = y_diab, Rkmeans = res_r_diab$cluster)
+res_my_diab$tot.withinss
+res_r_diab$tot.withinss
+
+```
+
+Notre implémentation donne les memes clusters que la fonction de R 
+
+
 # Sujet 2
 ```{r}
 library(cluster)
@@ -169,3 +289,255 @@ legend("topright",
 La classification KNN obtient une précision élevée à 96.7 % grâce à l'utilisation des étiquettes lors de l'entraînement. L’espèce setosa est totalement identifiée, et les confusions entre versicolor et virginica sont limitées à quelques observations, ce qui reflète leur forte proximité naturelle.
 À l’inverse, les méthodes non supervisées (k-means, PAM, Ward, DBSCAN) doivent découvrir la structure des données sans connaître les classes réelles. Elles isolent effectivement setosa, mais rencontrent davantage de difficultés pour séparer versicolor et virginica, car ces deux espèces se chevauchent dans l’espace des caractéristiques.
 Dans le cadre de notre tp, la classification supervisée est donc plus performante, car elle exploite l'information des étiquettes connues, apprend directement les frontières entre espèces et utilise la validation croisée pour optimiser son paramètre k. Elle produit ainsi une prédiction plus précise et plus stable que les méthodes non supervisées.
+
+```{r}
+
+
+library(cluster.datasets)
+library(cluster)
+library(amap)
+
+# Charger les données
+data("mammal.dentition", package = "cluster.datasets")
+x <- mammal.dentition[,-1]
+
+head(x)
+summary(x)
+pairs(x)
+
+# MÉTHODE 1: DISTANCE EUCLIDIENNE + NORMALISATION
+
+# Normalisation (centrage-réduction)
+x_norm <- scale(x)
+
+# Matrice de distance euclidienne
+dist_eucl_norm <- dist(x_norm, method = "euclidean")
+
+# --- K-means avec amap ---
+set.seed(2024)
+
+K <- 5:16
+inertie_eucl <- numeric(length(K))
+
+for(i in 1:length(K)) {
+  k <- K[i]
+  km_eucl <- Kmeans(x_norm, centers = k, method = "euclidean")
+  inertie_eucl[i] <- km_eucl$withinss
+}
+
+# Méthode du coude
+par(mfrow=c(1,1))
+plot(K, inertie_eucl, type = 'b', pch = 19, col = 'red',
+     xlab = "Nombre de clusters (k)", 
+     ylab = "Inertie intra-classe",
+     main = "Méthode du coude - Euclidienne normalisée")
+grid()
+
+k_optimal <- 14
+km_eucl_final <- Kmeans(x_norm, centers = k_optimal, method = "euclidean")
+
+# --- PAM (K-medoids) avec distance euclidienne ---
+pam_eucl <- pam(dist_eucl_norm, k = k_optimal)
+# Silhouette
+par(mfrow=c(1,1))
+sil_eucl <- silhouette(km_eucl_final$cluster, dist_eucl_norm)
+plot(sil_eucl, col = 2:(k_optimal+1), border = NA,
+     main = "Silhouette - K-means Euclidien")
+
+# --- Clustering hiérarchique ---
+par(mfrow=c(2,2))
+
+hc_eucl_complete <- hclust(dist_eucl_norm, method = "complete")
+plot(hc_eucl_complete, main = "Hiérarchique - Complete (Euclidien)")
+rect.hclust(hc_eucl_complete, k = k_optimal, border = "red")
+
+hc_eucl_average <- hclust(dist_eucl_norm, method = "average")
+plot(hc_eucl_average, main = "Hiérarchique - Average (Euclidien)")
+rect.hclust(hc_eucl_average, k = k_optimal, border = "red")
+
+hc_eucl_ward <- hclust(dist_eucl_norm, method = "ward.D2")
+plot(hc_eucl_ward, main = "Hiérarchique - Ward (Euclidien)")
+rect.hclust(hc_eucl_ward, k = k_optimal, border = "red")
+
+hc_eucl_single <- hclust(dist_eucl_norm, method = "single")
+plot(hc_eucl_single, main = "Hiérarchique - Single (Euclidien)")
+rect.hclust(hc_eucl_single, k = k_optimal, border = "red")
+
+# MÉTHODE 2: DISTANCE DE MANHATTAN SANS NORMALISATION
+
+# Distance de Manhattan (sans normalisation)
+dist_manh <- dist(x, method = "manhattan")
+
+# --- K-means avec amap ---
+set.seed(2024)
+
+inertie_manh <- numeric(length(K))
+
+for(i in 1:length(K)) {
+  k <- K[i]
+  km_manh <- Kmeans(x, centers = k, method = "manhattan")
+
+  inertie_manh[i] <- km_manh$withinss
+}
+
+# Méthode du coude
+par(mfrow=c(1,1))
+plot(K, inertie_manh, type = 'b', pch = 19, col = 'darkgreen',
+     xlab = "Nombre de clusters (k)", 
+     ylab = "Inertie intra-classe",
+     main = "Méthode du coude - Manhattan non normalisée")
+grid()
+
+# Appliquer k-means avec k optimal
+km_manh_final <- Kmeans(x, centers = k_optimal, method = "manhattan")
+
+# --- PAM avec distance de Manhattan ---
+pam_manh <- pam(dist_manh, k = k_optimal)
+
+# Silhouette
+par(mfrow=c(1,1))
+sil_manh <- silhouette(km_manh_final$cluster, dist_manh)
+plot(sil_manh, col = 2:(k_optimal+1), border = NA,
+     main = "Silhouette - K-means Manhattan")
+
+# --- Clustering hiérarchique ---
+par(mfrow=c(2,2))
+
+hc_manh_complete <- hclust(dist_manh, method = "complete")
+plot(hc_manh_complete, main = "Hiérarchique - Complete (Manhattan)")
+rect.hclust(hc_manh_complete, k = k_optimal, border = "red")
+
+hc_manh_average <- hclust(dist_manh, method = "average")
+plot(hc_manh_average, main = "Hiérarchique - Average (Manhattan)")
+rect.hclust(hc_manh_average, k = k_optimal, border = "red")
+
+hc_manh_ward <- hclust(dist_manh, method = "ward.D2")
+plot(hc_manh_ward, main = "Hiérarchique - Ward (Manhattan)")
+rect.hclust(hc_manh_ward, k = k_optimal, border = "red")
+
+hc_manh_single <- hclust(dist_manh, method = "single")
+plot(hc_manh_single, main = "Hiérarchique - Single (Manhattan)")
+rect.hclust(hc_manh_single, k = k_optimal, border = "red")
+
+# COMPARAISON DES DEUX MÉTHODES
+
+par(mfrow=c(1,2))
+
+# Comparaison des inerties
+plot(K, inertie_eucl, type = 'b', pch = 19, col = 'red',
+     xlab = "k", ylab = "Inertie",
+     main = "Comparaison des inerties", ylim = range(c(inertie_eucl, inertie_manh)))
+lines(K, inertie_manh, type = 'b', pch = 19, col = 'darkgreen')
+legend("topright", legend = c("Euclidienne (normalisée)", "Manhattan (non normalisée)"),
+       col = c("red", "darkgreen"), lwd = 2, pch = 19)
+grid()
+
+
+par(mfrow=c(1,1))
+table_comp <- table(Euclidienne = km_eucl_final$cluster, 
+                    Manhattan = km_manh_final$cluster)
+
+print("Table de contingence des clusters:")
+print(table_comp)
+
+# Scores de silhouette moyens
+print(paste("Silhouette moyenne Euclidienne:", round(mean(sil_eucl[,3]), 3)))
+print(paste("Silhouette moyenne Manhattan:", round(mean(sil_manh[,3]), 3)))
+
+# Aligner les clusters Manhattan sur Euclidienne
+library(clue)
+
+# Créer la matrice de contingence (transposée pour solve_LSAP)
+mat_contingence <- as.matrix(table_comp)
+
+# Trouver la meilleure correspondance
+correspondance <- solve_LSAP(mat_contingence, maximum = TRUE)
+
+# Réindexer les clusters Manhattan
+clusters_manh_alignes <- as.numeric(correspondance[km_manh_final$cluster])
+
+# Vérifier l'alignement
+table_alignee <- table(Euclidienne = km_eucl_final$cluster, 
+                       Manhattan_aligne = clusters_manh_alignes)
+print("Table après alignement:")
+print(table_alignee)
+
+# CHARGER LES VRAIES CLASSES
+
+# Charger les fichiers de classes
+classe <- read.table("C:/Users/enzom/OneDrive/Bureau/MINES/SDD/clustering/md_classes (3).csv", 
+                     sep = ";", header = TRUE)
+nom_class <- read.table("C:/Users/enzom/OneDrive/Bureau/MINES/SDD/clustering/classes_anim (5).csv", 
+                        sep = ";", header = TRUE)
+
+# Vérifier la structure
+head(classe)
+head(nom_class)
+
+vraies_classes <- classe[,ncol(classe)]
+
+# MATRICES DE CONFUSION
+
+# Matrice de confusion pour Euclidienne
+conf_eucl <- table(Vraie_classe = vraies_classes, 
+                   Cluster_Euclidien = km_eucl_final$cluster)
+
+# Matrice de confusion pour Manhattan
+conf_manh <- table(Vraie_classe = vraies_classes, 
+                   Cluster_Manhattan = km_manh_final$cluster)
+
+# Visualisation des matrices de confusion
+par(mfrow=c(1,2))
+image(1:ncol(conf_eucl), 1:nrow(conf_eucl), t(conf_eucl), 
+      col = heat.colors(20),
+      xlab = "Cluster Euclidien", ylab = "Vraie classe",
+      main = "Matrice de confusion - Euclidienne")
+text(rep(1:ncol(conf_eucl), each=nrow(conf_eucl)), 
+     rep(1:nrow(conf_eucl), ncol(conf_eucl)), 
+     labels = as.vector(t(conf_eucl)), cex = 1.2)
+
+image(1:ncol(conf_manh), 1:nrow(conf_manh), t(conf_manh), 
+      col = heat.colors(20),
+      xlab = "Cluster Manhattan", ylab = "Vraie classe",
+      main = "Matrice de confusion - Manhattan")
+text(rep(1:ncol(conf_manh), each=nrow(conf_manh)), 
+     rep(1:nrow(conf_manh), ncol(conf_manh)), 
+     labels = as.vector(t(conf_manh)), cex = 1.2)
+# Créer un dataframe avec les clusters et les vraies classes
+resultats <- data.frame(
+  cluster = km_manh_final$cluster,
+  vraie_classe = classe$zoo.class
+)
+
+# Compter la taille de chaque cluster
+taille_clusters <- table(km_manh_final$cluster)
+
+# Trier les clusters par taille décroissante
+clusters_ordonnes <- as.numeric(names(sort(taille_clusters, decreasing = TRUE)))
+
+# Analyser chaque cluster dans l'ordre
+for(i in seq_along(clusters_ordonnes)) {
+  cluster_actuel <- clusters_ordonnes[i]
+  
+  # Filtrer les observations de ce cluster
+  observations_cluster <- resultats[resultats$cluster == cluster_actuel, ]
+  
+  # Trouver la classe majoritaire
+  classes_counts <- table(observations_cluster$vraie_classe)
+  classe_majoritaire <- names(which.max(classes_counts))
+  pourcentage <- round(max(classes_counts) / sum(classes_counts) * 100, 1)
+  
+  # Afficher les résultats
+  cat("Cluster", cluster_actuel, 
+      "(taille:", taille_clusters[as.character(cluster_actuel)], "observations):\n")
+  cat("  → Classe majoritaire:", classe_majoritaire, 
+      "(", pourcentage, "% des observations)\n")
+  cat("  → Répartition complète:\n")
+  print(round(prop.table(classes_counts) * 100, 1))
+  cat("\n")
+}
+
+# Il faut probablement enlever la classe 15 oppossum qui a une seule observation (j'ai vu dans le DS de l'année précédente)
+
+```
+
