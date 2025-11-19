@@ -1,0 +1,171 @@
+---
+title: "TP - Clustering & Classification"
+author: "Enzo Munoz - Hugo Munier"
+date: "2025-11-26"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: true
+  html_document:
+    html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+header-includes:
+    - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(
+  fig.width = 7,        
+  fig.height = 4.5,
+  out.width = "90%",    
+  fig.align = "center", 
+  fig.pos = "H"       
+)
+knitr::opts_chunk$set(
+  message = FALSE,   
+  warning = FALSE    
+)
+```
+# Sujet 2
+```{r}
+library(cluster)
+library(dbscan)
+library(class)
+library(caret)
+```
+## Préparation des données & Visualisation de la classification faite
+```{r}
+data(iris)
+set.seed(123)
+
+X <- iris[,1:4]
+X_scaled <- scale(X)
+
+acp <- prcomp(X_scaled)
+
+plot(acp$x[,1], acp$x[,2],
+     col = iris$Species,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Espèces réelles - iris")
+legend("topright", legend = levels(iris$Species),
+       col = 1:3, pch = 19)
+```
+## Méthode des K-moyennes avec K = 3
+```{r}
+km3 <- kmeans(X_scaled, centers = 3, nstart =25)
+
+table(Cluster = km3$cluster, Species = iris$Species)
+
+plot(acp$x[,1], acp$x[,2],
+     col = km3$cluster,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Clustering k-means (K = 3) sur iris")
+legend("topright", legend = paste("Cluster", 1:3),
+       col = 1:3, pch = 19)
+```
+La classification obtenue par k-means avec K = 3 reflète la structure des données. L’espèce setosa est parfaitement isolée dans le cluster 1, ce qui montre qu’elle est distincte des deux autres espèces. En revanche, les espèces versicolor et virginica se recouvrent partiellement. Elles se partagent les clusters 2 et 3
+Cette confusion entre versicolor et virginica était déjà visible dans la projection PCA et s’explique par la proximité de ces deux espèces dans l’espace des caractéristiques mesurées.
+
+## Méthode K-médoïdes (PAM) avec K=3
+```{r}
+pam3 <- pam(X_scaled, k = 3)
+
+table(Cluster = pam3$clustering, Species = iris$Species)
+
+plot(acp$x[,1], acp$x[,2],
+     col = pam3$clustering,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Clustering PAM (K = 3) sur iris")
+legend("topright", legend = paste("Cluster", 1:3),
+       col = 1:3, pch = 19)
+```
+La méthode K-médoïdes retrouve entierement l'espèce setosa. Toutes les observations se regroupent dans le cluster 1. En revanche, les espèces versicolor et virginica sont à nouveau mélangées, mais différement des k-moyens. En effet, cette méthode isole deux clusters constitués majoritairement de virginca pour l'un et de versicolor pour l'autre. Les K-médoïdes semblent mieux capturer la structure de données dans l'espace PCA. Ce qui est véridique car cette méthode est plus robuste aus valeurs extrêmes que celle des k-moyens.
+Comme la méthode des k-moyens, la confusion entre versicolor et virginica est le reflet de leur forte proximité. 
+
+# Classification hiéarchique par méthode de Ward
+```{r}
+d <- dist(X_scaled, method = "euclidean")
+
+hc <- hclust(d, method = "ward.D2")
+
+cl_hc <- cutree(hc, k = 3)
+
+table(Cluster = cl_hc, Species = iris$Species)
+
+plot(acp$x[,1], acp$x[,2],
+     col = cl_hc,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Clustering hiérarchique (Ward, k = 3) sur iris")
+legend("topright", legend = paste("Cluster", 1:3),
+       col = 1:3, pch = 19)
+```
+La classification hiérarchique par méthode de Ward identifie très clairement l’espèce setosa, regroupée à 49 observations sur 50 dans le cluster 1. Les deux autres espèces, versicolor et virginica, sont séparées en deux clusters relativement homogènes. Le cluster 2 est majoritairement composé de versicolor (27/30) tandis que le cluster 3 regroupe principalement virginica (48/71).
+La méthode hiérarchique de Ward distingue mieux versicolor et virginica que k-means car elle ne suppose pas de clusters sphériques. Elle construit les groupes en minimisant l’augmentation de l’inertie intra-classe à chaque fusion, ce qui permet de capturer la géométrie des données. Dans les données iris, cela conduit à deux clusters relativement homogènes correspondant majoritairement à versicolor et virginica, alors que k-means mélange davantage ces deux espèces en raison de leurs zones de recouvrement non sphériques.
+
+## Méthode DBSCAN
+```{r}
+kNNdistplot(X_scaled, k = 5)
+abline(h = 0.6, lty = 2)
+
+db <- dbscan(X_scaled, eps = 0.6, minPts = 5)
+
+table(db$cluster)
+table(Cluster = db$cluster, Species = iris$Species)
+
+cols <- db$cluster
+cols <- cols + 1
+
+plot(acp$x[,1], acp$x[,2],
+     col = cols,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Clustering DBSCAN sur iris")
+legend("topright",
+       legend = paste("Cluster", 1:3),
+       col = sort(unique(cols)), pch = 19)
+```
+Avec les paramètres eps ≈ 0.6 et minPts = 5, DBSCAN identifie un cluster très dense et très homogène correspondant à l’espèce setosa, tandis que versicolor et virginica sont regroupées dans un second cluster.
+Ce résultat confirme que setosa est une espèce très distincte, alors que versicolor et virginica occupent une zone de densité similaire dans l’espace des variables mesurées.
+Enfin, DBSCAN classe 26 observations comme bruit (cluster 0), ce qui correspond aux points périphériques visibles sur la PCA. Ce comportement est caractéristique de DBSCAN, qui met en évidence des points atypiques et ne force pas toutes les données à appartenir à un cluster.
+
+## KNN
+```{r}
+set.seed(123)
+ctrl <- trainControl(method = "cv", number = 10)
+
+grid <- expand.grid(k = seq(1, 15, by = 2))
+
+knn_cv <- train(Species ~ .,
+                data = iris,
+                method = "knn",
+                trControl = ctrl,
+                preProcess = c("center", "scale"),
+                tuneGrid = grid)
+
+plot(knn_cv)
+
+pred_knn <- predict(knn_cv, newdata = iris)
+
+conf_mat <- confusionMatrix(pred_knn, iris$Species)
+conf_mat
+
+plot(acp$x[,1], acp$x[,2],
+     col = pred_knn,
+     pch = 19,
+     xlab = "PC1", ylab = "PC2",
+     main = "Classification KNN (CV 10-fold) sur iris")
+legend("topright",
+       legend = paste("Cluster", 1:3),
+       col = 1:3,pch = 19)
+```
+La classification KNN obtient une précision élevée à 96.7 % grâce à l'utilisation des étiquettes lors de l'entraînement. L’espèce setosa est totalement identifiée, et les confusions entre versicolor et virginica sont limitées à quelques observations, ce qui reflète leur forte proximité naturelle.
+À l’inverse, les méthodes non supervisées (k-means, PAM, Ward, DBSCAN) doivent découvrir la structure des données sans connaître les classes réelles. Elles isolent effectivement setosa, mais rencontrent davantage de difficultés pour séparer versicolor et virginica, car ces deux espèces se chevauchent dans l’espace des caractéristiques.
+Dans le cadre de notre tp, la classification supervisée est donc plus performante, car elle exploite l'information des étiquettes connues, apprend directement les frontières entre espèces et utilise la validation croisée pour optimiser son paramètre k. Elle produit ainsi une prédiction plus précise et plus stable que les méthodes non supervisées.
