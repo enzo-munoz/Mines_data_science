@@ -532,6 +532,8 @@ En revanche, s’il s’agit de valeurs aberrantes ou de conditions expérimenta
 
 Dans ce cas, il serait donc pertinent de tester une ACP sans ces individus extrêmes afin de comparer la stabilité des axes et l’évolution de la variance expliquée.
 ```{r}
+
+
 plot.PCA(res, choix = "ind", 
        habillage = "SAISON",
        label = "quali", cex = 0.8,
