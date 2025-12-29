@@ -15,20 +15,90 @@ A titre indicatif, le temps à consacrer à ce TP hors cours est de deux à quat
 
 # Question 1. Vos noms
 
-Insérer ci-après le nom de chaque personne du groupe. Remplacer les noms ci-après, Nom en majuscule (=family name, UPPER CASE), Prénom en minuscule (first name, lower case).
-
 ```{r}
-#1. DURAND Victor
-#2. DUPONT Annette
-#3. DUCHEMIN Pierre
-#4. DULAC Isis
+#1. MUNOZ Enzo 
+#2. MUNIER Hugo
+#3. GUILBAUD Maxime
 ```
 
 L'ordre n'a pas d'importance, mais la personne en position 1 sera celle qui remettra le TP sur Campus. Merci de n'opérer qu'une seule remise par groupe! Merci de nommer vos fichiers en faisant apparaître le premier nom, par exemple ici: `TPXXX_GroupeDURAND.Rmd`, `TPXXX_GroupeDURAND.html`
 
-ATTENTION! seul les noms inscrits dans le documents seront utilisés, *aucun ajout a posteriori ne sera accepté*. Vérifiez bien la présence de tous les membres avant la remise.
-
 # Question 2. Votre prédiction
+
+
+```{r seed}
+set.seed(123456)
+library(DiceKriging)
+```
+
+
+```{r}
+
+Observations = read.csv("defi_observations.csv", header = TRUE)
+X<- Observations[,-8]
+Y<- Observations[,8]
+n<- length(Y)
+d<- length(X)
+
+X_new = read.csv("defi_apredire.csv", header = TRUE)
+```
+
+
+```{r}
+pairs(X)
+```
+
+
+```{r}
+plot(X[,2], Y)
+```
+# Krigage Simple
+
+```{r}
+theta<- 1
+sigma2<- 1
+monModele <- km(formula = ~1, design = X, response = Y, covtype = "gauss", coef.trend = 0, coef.cov = theta, coef.var = sigma2)
+```
+
+# Validation croisée
+
+```{r}
+split <- sample(1:n, size = round(0.2 * n))
+
+Xtrain <- X[-split, ]
+Xtest  <- X[split, ]
+
+Ytrain <- Y[-split]
+Ytest  <- Y[split]
+
+crossValidationError <- function(famille, theta) {
+
+    monModele <- km(formula = ~1, design = Xtrain, response = Ytrain, covtype = famille, coef.trend = 0,  coef.cov = theta, coef.var = 1)
+  prediction <- predict(object = monModele, newdata = Xtest , type="SK" , checkNames=FALSE, se.compute=FALSE)  
+
+  error =  (mean((prediction$mean -Ytest)^2))   
+  
+  return(error)
+}
+theta<- rep(1, 7)
+essai <- crossValidationError("matern3_2", theta)
+message("erreur =", essai)
+
+```
+
+```{r}
+crossValidationErrorOnVector <- Vectorize(crossValidationError, "theta")
+
+thetaRange <- rep(seq(0.4, 5, length.out = 10), 7)
+errors <- crossValidationErrorOnVector("matern3_2",thetaRange)
+plot(thetaRange, (errors), type="l")
+
+#optimalTheta = thetaRange[(errors-min(errors)<1e-16)]
+optimalTheta = thetaRange[which.min(errors)]
+abline(v=optimalTheta, col="red")
+title(main = paste("optimalTheta = ", optimalTheta))
+```
+
 
 Vous trouverez dans le répertoire de Campus un fichier intitulé "defi_observations.csv", il comporte des observations pour 7 variables X1, ..., X7, et une variable à prédire Y.
 
@@ -51,20 +121,9 @@ Veillez à remettre impérativement ces trois fichiers:
 * Un notebook Rmd (ou jupyter)
 * la sortie html ou pdf correspondante (bouton knit) faisant tourner votre programme
 
-```{r seed}
-set.seed(123456)
-```
-
-Voici un exemple pour l'import et l'export:
 
 ```{r import export données}
 # ce qui est donné:
-
-# lecture: Observations contient les X et les Y correspondants
-Observations = read.csv("defi_observations.csv", header = TRUE)
-
-# lecture: Apredire ne contient que des X, il faut prédire les Y
-Apredire = read.csv("defi_apredire.csv", header = TRUE)
 
 # Votre prédiction; faites mieux, hein ;-)
 Y = Apredire$X1 + mean(Observations$Y)
