@@ -27,8 +27,9 @@ L'ordre n'a pas d'importance, mais la personne en position 1 sera celle qui reme
 
 
 ```{r seed}
-set.seed(123456)
 library(DiceKriging)
+library(caret)
+library(FactoMineR)
 ```
 
 
@@ -41,35 +42,46 @@ n<- length(Y)
 d<- length(X)
 
 X_new = read.csv("defi_apredire.csv", header = TRUE)
+range_Y<- max(Y) - min(Y)
 ```
+
+## Faire une analyse ACP !
+```{r}
+Y_scaled<- (Y - min(Y))/range_Y
+obs<- cbind(X, Y_scaled)
+res <- PCA(obs,
+                   scale.unit = FALSE,   
+                   ncp = 7,             
+                   graph = TRUE) 
+```
+On ne peut pas conclure sur l'importance des variables, les 2 dimensions principales ne représentent que 35 % de l'information. 
 
 
 ```{r}
-pairs(X)
+pairs(Observations)
 ```
+Indépendance des X : Les croisements entre $X1...X7$ forment des carrés parfaits très denses. 
+
+Cela indique que tes données d'entrée sont probablement issues d'un plan d'expérience (type Latin Hypercube Sampling), où les variables sont effectivement décorrélées entre elles.
 
 
 ```{r}
 plot(X[,2], Y)
 ```
-# Krigage Simple
+
+# Validation croisée pour la famille matern en krigeage simple !
+
+J'utilise la bibliothèque caret pour que mon split soit automatiquement stratifié en fonction des quantiles de Y.
 
 ```{r}
-theta<- 1
-sigma2<- 1
-monModele <- km(formula = ~1, design = X, response = Y, covtype = "gauss", coef.trend = 0, coef.cov = theta, coef.var = sigma2)
-```
+set.seed(123456)
 
-# Validation croisée
+trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
 
-```{r}
-split <- sample(1:n, size = round(0.2 * n))
-
-Xtrain <- X[-split, ]
-Xtest  <- X[split, ]
-
-Ytrain <- Y[-split]
-Ytest  <- Y[split]
+Xtrain <- X[trainIndex, ]
+Xtest  <- X[-trainIndex, ]
+Ytrain <- Y[trainIndex]
+Ytest  <- Y[-trainIndex]
 
 crossValidationError <- function(famille, theta) {
 
@@ -80,25 +92,86 @@ crossValidationError <- function(famille, theta) {
   
   return(error)
 }
-theta<- rep(1, 7)
-essai <- crossValidationError("matern3_2", theta)
+theta_vec <- rep(1, d)
+
+essai <- crossValidationError("matern3_2", theta_vec)
 message("erreur =", essai)
 
 ```
 
-```{r}
-crossValidationErrorOnVector <- Vectorize(crossValidationError, "theta")
+### Analyse de la sensibilité et Optimisation Anisotrope
 
-thetaRange <- rep(seq(0.4, 5, length.out = 10), 7)
-errors <- crossValidationErrorOnVector("matern3_2",thetaRange)
-plot(thetaRange, (errors), type="l")
+Peut-on optimiser avec le même theta selon toutes les directions tq : theta_optim = rep(theta, 7) ???
 
-#optimalTheta = thetaRange[(errors-min(errors)<1e-16)]
-optimalTheta = thetaRange[which.min(errors)]
-abline(v=optimalTheta, col="red")
-title(main = paste("optimalTheta = ", optimalTheta))
+## Réponse Chat + Enzo
+
+Sensibilité de Y : C'est là que ton hypothèse d'un $\theta$ unique tombe.$Y$ est fortement corrélé à $X1$ et $X2$ (on voit une structure linéaire/croissante très nette).$Y$ semble être du bruit total face à $X3, X4, X5, X6, X7$ (nuages informes).
+
+Pourquoi $\theta$ ne peut PAS être le même ?
+
+Le fait que les $X$ soient indépendants entre eux n'implique pas que $Y$ réagisse de la même façon à chaque $X$.$\theta_i$ représente la portée (ou "length-scale"). Plus $\theta_i$ est grand, plus la variable $X_i$ est considérée comme "lisse" ou peu influente localement.
+
+Ici, comme $X1$ et $X2$ expliquent presque toute la variation de $Y$, le modèle aura besoin de $\theta$ précis pour ces dimensions. 
+
+Pour les autres ($X3...X7$), l'optimiseur risque de pousser les $\theta$ vers des valeurs très grandes pour "lisser" leur absence d'influence.
+
+Conclusion : Tu as besoin d'un modèle anisotrope (un $\theta$ par dimension).
+
+Résumé : Au vu du graphique `pairs()`, on observe une forte dépendance de $Y$ envers $X1$ et $X2$, tandis que les autres variables semblent peu influentes. Utiliser un $\theta$ unique (modèle isotrope) masquerait cette réalité physique.
+
+```{r optimisation-anisotrope}
+
+# 1. Définition de la fonction d'erreur pour 7 portées différentes
+objective_anisotrope <- function(theta_vec) {
+  # On s'assure que theta_vec a bien une longueur de 7
+  val <- tryCatch({
+    crossValidationError(famille = "matern3_2", theta = theta_vec)
+  }, error = function(e) return(Inf))
+  return(val)
+}
+
+# 2. Configuration de l'optimiseur
+# On part d'un theta de 1 pour chaque dimension
+theta_start <- rep(1, 7)
+lower_b <- rep(0.01, 7)
+upper_b <- rep(20, 7) # On laisse une plage large
+
+# 3. Recherche des meilleurs paramètres
+opt_res <- optim(par = theta_start, 
+                 fn = objective_anisotrope, 
+                 method = "L-BFGS-B", 
+                 lower = lower_b, 
+                 upper = upper_b,
+                 control = list(maxit = 100)) # "maxit" bride le temps de calcul
+
+# 4. Affichage des résultats pour preuve
+df_thetas <- data.frame(
+  Variable = paste0("X", 1:7),
+  Theta_Optimal = opt_res$par
+)
+
+print(df_thetas)
+
+
 ```
 
+Les thetas pour X3, X6, X5 sont égal à l'upper bound et X7 avec 17,8. Qu'est ce que ça signifie ? 
+Peut-on les supprimer ? Même pour X4 theta = 6.53 indique pour matern 3/2 que le modèle considère que tous les points sont proches et ça revient à ignorer les variations de $Xi$.
+
+On pense donc pour la suite, faire une méthode de krigeage ordinaire et universel avec d'autre kernel. 
+
+Optim.method pour laisser chercher les hyperparamètres directement dans la fonction dicekriging.
+
+
+```{r}
+modele <- km(design=X_train, response=Y_train, covtype="matern3_2",
+             optim.method = "BFGS", 
+             control = list(maxit = 30)) # Maximum 30 itérations
+
+```
+
+
+# Consignes
 
 Vous trouverez dans le répertoire de Campus un fichier intitulé "defi_observations.csv", il comporte des observations pour 7 variables X1, ..., X7, et une variable à prédire Y.
 
