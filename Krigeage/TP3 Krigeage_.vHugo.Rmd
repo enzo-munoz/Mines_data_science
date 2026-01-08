@@ -1,0 +1,290 @@
+---
+title: "TP3 Krigeage - Challenge 2025-2026"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+#1. MUNOZ Enzo 
+#2. MUNIER Hugo
+#3. GUILBAUD Maxime
+```
+
+# Notre prédiction
+
+```{r seed}
+set.seed(123456)
+library(ggplot2)
+library(GGally)
+library(sp)
+library(gstat)
+```
+
+## Collecte du jeu de données
+```{r}
+Observations <- read.csv("defi_observations.csv", header = TRUE)
+Apredire     <- read.csv("defi_apredire.csv", header = TRUE)
+```
+
+## Collecte du jeu de données
+```{r}
+cat("Observations : ", nrow(Observations), "lignes,", ncol(Observations), "colonnes\n")
+cat("Apredire     : ", nrow(Apredire),     "lignes,", ncol(Apredire),     "colonnes\n")
+
+cat("\nColonnes Observations :\n"); print(colnames(Observations))
+cat("\nColonnes Apredire :\n"); print(colnames(Apredire))
+
+cat("\nStructure Observations:\n"); str(Observations)
+cat("\nStructure Apredire:\n"); str(Apredire)
+
+print(head(Observations, 5))
+print(head(Apredire, 5))
+
+cat("\nSummary Observations:\n"); print(summary(Observations))
+cat("\nSummary Apredire:\n"); print(summary(Apredire))
+
+cat("\nNA par colonne (Observations):\n"); print(colSums(is.na(Observations)))
+cat("\nNA par colonne (Apredire):\n"); print(colSums(is.na(Apredire)))
+```
+
+## Visualisation du jeu de données
+```{r}
+Xcols <- paste0("X", 1:7)
+
+ggpairs(
+  Observations,
+  columns = which(colnames(Observations) %in% Xcols),
+  aes(color = Y, alpha = 0.6),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag  = list(continuous = "densityDiag")
+) +
+  scale_color_viridis_c() +
+  theme(
+    legend.position = "none",
+    axis.text  = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+
+ggplot(Observations, aes(x = X1, y = X2, color = Y)) +
+  geom_point(size = 2) +
+  scale_color_viridis_c() +
+  labs(
+    title = "Visualisation brute des observations",
+    x = "X1",
+    y = "X2",
+    color = "Y"
+  ) +
+  theme_minimal()
+```
+En examinant cette matrice, on voit clairement que Y augmente lorsque les varaibles X1 et X2 augmentent. En revanche, aucune relation claire n'apparait entre les variables X3 à X7. Les valeurs de Y sont dispersées. On en déduit que X1 et X2 jouent un rôle important dans la structuration de Y. 
+
+```{r}
+# Y ~ X1
+ggplot(Observations, aes(x = X1, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X1", x = "X1", y = "Y") +
+  theme_minimal()
+
+# Y ~ X2
+ggplot(Observations, aes(x = X2, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X2", x = "X2", y = "Y") +
+  theme_minimal()
+```
+Ces deux graphiques confirment que Y a une tendance globale croissante en fonction de X1 et de X2. Mais cette tendance est plus prononcée pour X2. De plus, on remarque sur les deux graphiques la présence d'une dispersion. Ces deux graphes nous conduisent à faire recours à un krigeage avec une tendance, soit le krigeage universel. 
+
+```{r}
+# Création de bandes de X2 (4 groupes)
+Observations$X2_bin <- cut(
+  Observations$X2,
+  breaks = quantile(Observations$X2, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X1, y = Y, color = X2_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X1 par bandes de X2 (tester additif vs interaction)",
+    x = "X1", y = "Y", color = "Bande X2"
+  ) +
+  theme_minimal()
+
+Observations$X1_bin <- cut(
+  Observations$X1,
+  breaks = quantile(Observations$X1, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X2, y = Y, color = X1_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X2 par bandes de X1 (tester additif vs interaction)",
+    x = "X2", y = "Y", color = "Bande X1"
+  ) +
+  theme_minimal()
+```
+Ces graphiques nous permettent de faire une analyse par bandes. On remarque pour chaque bande de X1, Y augmente avec X2. Les courbes ont aussi des formes très similaires et sont globalement parallèles. Il en est de même pour l'autre graphique. On peut déduire alors une influence plutôt additive de X1 et X2 sur Y, sans interaction forte visinle entre ces deux variables.
+
+```{r}
+n_s <- 250
+idx <- sample(1:nrow(Observations), n_s)
+S <- Observations[idx, c("X1", "X2", "Y")]
+
+# Construire quelques paires aléatoires
+m <- 4000
+i <- sample(1:n_s, m, replace = TRUE)
+j <- sample(1:n_s, m, replace = TRUE)
+
+dx <- S$X1[i] - S$X1[j]
+dy <- S$X2[i] - S$X2[j]
+dist_ij <- sqrt(dx^2 + dy^2)
+dY <- abs(S$Y[i] - S$Y[j])
+
+df_pairs <- data.frame(dist = dist_ij, dY = dY)
+
+ggplot(df_pairs, aes(x = dist, y = dY)) +
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Variabilité locale : |ΔY| en fonction de la distance (X1,X2)",
+    x = "Distance entre points",
+    y = "|ΔY|"
+  ) +
+  theme_minimal()
+```
+On a voulu évaluer la dépendance spatiale de Y. Pour cela, on a tracé la différence absolue des valeurs de Y en fonction de la distance entre les points. On voit que les différences de Y augmentent avec la distance. Ainsi, les points proches présentent des valeurs plus similaires que les points éloignés. De plus, on voit que pour des distances très faible la différence absolue n'est pas forcément nulle ce qui suggère une variabilité locale. Ce qui est compatible avec les hypothèses du krigeage. 
+
+## Hypothèses de modélisation (à modifier pour que ca sonne plus nous)
+L’analyse visuelle met en évidence une tendance globale de la variable Y selon les variables X1 et X2, ce qui rend l’hypothèse d’une moyenne constante non pertinente. Par conséquent, un krigeage simple ou ordinaire n’est pas adapté. Les effets de X1 et X2 apparaissant principalement additifs, une tendance explicite peut être introduite dans le modèle. La variabilité locale observée suggère un phénomène globalement lisse, mais bruité à petite échelle. Le processus n’est donc pas stationnaire au sens strict, mais peut être supposé stationnaire après retrait de la tendance, ce qui justifie l’utilisation d’un krigeage universel.
+
+## Variogramme empirique
+```{r}
+data_sp <- Observations
+coordinates(data_sp) <- ~ X1 + X2
+
+# distance max entre points (dans l'espace X1,X2)
+dmax <- spDists(coordinates(data_sp), longlat = FALSE)
+dmax <- max(dmax)
+
+# choix standards (robustes)
+cutoff_val <- 0.5 * dmax
+width_val  <- cutoff_val / 15  # ~15 classes
+
+vg_Y <- variogram(Y ~ 1, data_sp, cutoff = cutoff_val, width = width_val)
+plot(vg_Y, main = "Variogramme empirique - Y brut")
+```
+
+```{r}
+# Ajustement tendance (additive simple)
+trend_lm <- lm(Y ~ X1 + X2, data = Observations)
+Observations$resid <- residuals(trend_lm)
+
+# repasser en objet spatial (avec la colonne resid)
+data_sp2 <- Observations
+coordinates(data_sp2) <- ~ X1 + X2
+
+vg_resid <- variogram(resid ~ 1, data_sp2, cutoff = cutoff_val, width = width_val)
+plot(vg_resid, main = "Variogramme empirique - Résidus (Y ~ X1 + X2)")
+```
+
+```{r}
+vg_dir <- variogram(resid ~ 1, data_sp2,
+                    alpha = c(0, 45, 90, 135),
+                    cutoff = cutoff_val, width = width_val)
+
+plot(vg_dir, main = "Variogrammes directionnels (résidus)")
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Voici un exemple pour l'import et l'export:
+
+```{r import export données}
+# ce qui est donné:
+
+# lecture: Observations contient les X et les Y correspondants
+Observations = read.csv("defi_observations.csv", header = TRUE)
+
+# lecture: Apredire ne contient que des X, il faut prédire les Y
+Apredire = read.csv("defi_apredire.csv", header = TRUE)
+
+# Votre prédiction; faites mieux, hein ;-)
+Y = Apredire$X1 + mean(Observations$Y)
+# votre Y prédit ici X1 + la moyenne des Y, c'est très mauvais!
+
+# Votre exportation
+# On concatène d'abord les X avec le Y prédit à l'aide de cbind
+MonFichierSoumis =  cbind(Apredire, Y)
+
+# puis on exporte
+MonNomDeFichier = "DefiGroupeDURAND.csv" # nom de fichier à adapter hein!!!
+write.csv(MonFichierSoumis, MonNomDeFichier, row.names = FALSE)
+
+#on vérifie que c'est bien lisible
+LectureDeMonFichier = read.csv(MonNomDeFichier, header = TRUE)
+
+#on fait des vérifications élémentaires, bon nombre de lignes, de colonnes, etc.
+#on ne doit voir apparaître que des TRUE, sinon ce n'est pas bon!
+message(nrow(LectureDeMonFichier) == 100, ": bon nombre de lignes")
+message(ncol(LectureDeMonFichier) == 8, ": bon nombre de colonnes")
+message(abs(LectureDeMonFichier[37,3]-Apredire[37,3])<1e-6, ": X3 semble ok pour la ligne 37")
+message(sum(colnames(LectureDeMonFichier)==c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "Y")) == 8, ": les colonnes sont bien nommées")
+```
+
+Voilà, c'est à vous, vous n'avez plus qu'à faire vos prédictions! en remplaçant la ligne `Y = Apredire$X1 + mean(Observations$Y)` bien sûr!
+
+Bon courage!
+
