@@ -272,6 +272,125 @@ plot(vg_emp, main = "Variogramme empirique des résidus (TRAIN)")
 L'objectif de ce variogramme empirique des réisuds est d'identifier une dépendance spatiale des résidus. On observe une augmentation progressive de la semi-variance avec la distance. On en déduit que des résidus proches spatialement sont plus similaires que ceux éloignés, et ainsi la présence d'une dépendance spatiale des résidus. De plus, on observe que pour des faibles distances la semi-variance est non nulle. Alors, on peut dire qu'il existe un effet nugget. Enfin, on observe aucun palier sur le domaine étudié. Donc, on pense qu'il y a une corrélation spatiale qui est supérieur à la distance maximale observée.
 Avec les informations que l'on a déduites, on pense plutôt utiliser un modèle de variogramme exponentiel car il est plus adapté à une corrélation spatiale de longue portée. Nous souhaitons pas utilisé un modèle gaussien car il suppose ici une structure des résidus très lisse à courte distance, ce qui n'est pas le cas avec la présence d'un effet nugget.
 
+## Estimation des thétas pas Cross-Validation
+
+Afin d'avoir une estimation plus précise des thétas, on décide de les estimer par cross-validation sur les résidus.
+
+```{r}
+data_sp <- Observations
+coordinates(data_sp) <- ~ X1 + X2
+
+n <- nrow(data_sp)
+
+dmax <- max(spDists(coordinates(data_sp), longlat = FALSE))
+cutoff_val <- 0.5 * dmax
+```
+
+```{r}
+rmse_internal_theta <- function(train_df, vgm_try, k = 5, seed = 123) {
+  set.seed(seed)
+  idx <- sample(rep(1:k, length.out = nrow(train_df)))
+  errs <- c()
+
+  for (fold in 1:k) {
+    tr <- train_df[idx != fold, ]
+    te <- train_df[idx == fold, ]
+
+    # Régression (tendance) refaite sur tr
+    lm_tr <- lm(Y ~ X1 + X2, data = tr)
+    tr$resid <- tr$Y - predict(lm_tr, newdata = tr)
+    te$resid <- te$Y - predict(lm_tr, newdata = te)
+
+    # Krigeage des résidus (OK sur tr -> prédire te)
+    coordinates(tr) <- ~ X1 + X2
+    coordinates(te) <- ~ X1 + X2
+
+    pred <- krige(resid ~ 1, tr, te, model = vgm_try)
+    errs <- c(errs, te$resid - pred$var1.pred)
+  }
+
+  sqrt(mean(errs^2, na.rm = TRUE))
+}
+```
+
+```{r}
+lm0 <- lm(Y ~ X1 + X2, data = as.data.frame(data_sp))
+res0 <- residuals(lm0)
+s2   <- var(res0, na.rm = TRUE)
+
+# grilles (à adapter si besoin)
+ranges  <- seq(cutoff_val/20, cutoff_val, length.out = 15)
+nuggets <- c(0, 0.01, 0.05, 0.1, 0.2) * s2
+psills  <- seq(0.2, 1.5, length.out = 12) * s2
+
+cov_models <- list(
+  Exp  = list(model = "Exp"),
+  Gau  = list(model = "Gau"),
+  Mat32 = list(model = "Mat", kappa = 1.5),
+  Mat52 = list(model = "Mat", kappa = 2.5)
+)
+```
+
+```{r}
+results <- data.frame()
+
+for (m in names(cov_models)) {
+
+  best <- list(rmse = Inf)
+
+  for (r in ranges) {
+    for (ng in nuggets) {
+      for (ps in psills) {
+
+        vgm_try <- vgm(
+          psill  = ps,
+          model  = cov_models[[m]]$model,
+          range  = r,
+          nugget = ng,
+          kappa  = cov_models[[m]]$kappa
+        )
+
+        rmse <- rmse_internal_theta(train_df, vgm_try, k = 5)
+
+        if (is.finite(rmse) && rmse < best$rmse) {
+          best <- list(
+            rmse   = rmse,
+            range  = r,
+            nugget = ng,
+            psill  = ps
+          )
+        }
+      }
+    }
+  }
+
+  results <- rbind(
+    results,
+    data.frame(
+      Model  = m,
+      RMSE   = best$rmse,
+      Range  = best$range,
+      Sill   = best$psill,
+      Nugget = best$nugget
+    )
+  )
+}
+
+results
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+
+
+
 ## Ajustement du modèle de variogramme expnonentiel
 ```{r}
 sill0   <- var(res_train)
