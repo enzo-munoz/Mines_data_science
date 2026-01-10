@@ -162,10 +162,18 @@ ggplot(df_pairs, aes(x = dist, y = dY)) +
   ) +
   theme_minimal()
 ```
-On a voulu évaluer la dépendance spatiale de Y. Pour cela, on a tracé la différence absolue des valeurs de Y en fonction de la distance entre les points. On voit que les différences de Y augmentent avec la distance. Ainsi, les points proches présentent des valeurs plus similaires que les points éloignés. De plus, on voit que pour des distances très faible la différence absolue n'est pas forcément nulle ce qui suggère une variabilité locale. Ce qui est compatible avec les hypothèses du krigeage. 
+On a voulu évaluer la dépendance spatiale de Y. Pour cela, on a tracé la différence absolue des valeurs de Y en fonction de la distance entre les points. On voit que les différences de Y augmentent avec la distance. Ainsi, les points proches présentent des valeurs plus similaires que les points éloignés. De plus, on voit que pour des distances très faible la différence absolue n'est pas forcément nulle ce qui suggère une variabilité locale.
 
 ## Hypothèses de modélisation (à modifier pour que ca sonne plus nous)
 L’analyse visuelle met en évidence une tendance globale de la variable Y selon les variables X1 et X2, ce qui rend l’hypothèse d’une moyenne constante non pertinente. Par conséquent, un krigeage simple ou ordinaire n’est pas adapté. Les effets de X1 et X2 apparaissant principalement additifs, une tendance explicite peut être introduite dans le modèle. La variabilité locale observée suggère un phénomène globalement lisse, mais bruité à petite échelle. Le processus n’est donc pas stationnaire au sens strict, mais peut être supposé stationnaire après retrait de la tendance, ce qui justifie l’utilisation d’un krigeage universel.
+
+Comme le krigeage universel revient à faire une régression puis du krigeage simple ou ordinaire sur les résidus. On va faire la régression dans la suite
+
+## Régression
+```{r}
+
+```
+
 
 ## Variogramme empirique
 ```{r}
