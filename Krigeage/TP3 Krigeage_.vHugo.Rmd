@@ -21,35 +21,42 @@ set.seed(123456)
 library(ggplot2)
 library(GGally)
 library(sp)
+library(DiceKriging)
+library(caret)
+library(FactoMineR)
 library(gstat)
 ```
 
 ## Collecte du jeu de données
 ```{r}
 Observations <- read.csv("defi_observations.csv", header = TRUE)
-Apredire     <- read.csv("defi_apredire.csv", header = TRUE)
+X<- Observations[,-8]
+Y<- Observations[,8]
+n<- length(Y)
+d<- length(X)
+
+X_new = read.csv("defi_apredire.csv", header = TRUE)
+range_Y<- max(Y) - min(Y)
 ```
 
 ## Collecte du jeu de données
 ```{r}
 cat("Observations : ", nrow(Observations), "lignes,", ncol(Observations), "colonnes\n")
-cat("Apredire     : ", nrow(Apredire),     "lignes,", ncol(Apredire),     "colonnes\n")
+cat("Apredire     : ", nrow(X_new),     "lignes,", ncol(X_new),     "colonnes\n")
 
 cat("\nColonnes Observations :\n"); print(colnames(Observations))
-cat("\nColonnes Apredire :\n"); print(colnames(Apredire))
+cat("\nColonnes Apredire :\n"); print(colnames(X_new))
 
 cat("\nStructure Observations:\n"); str(Observations)
-cat("\nStructure Apredire:\n"); str(Apredire)
-
-print(head(Observations, 5))
-print(head(Apredire, 5))
+cat("\nStructure Apredire:\n"); str(X_new)
 
 cat("\nSummary Observations:\n"); print(summary(Observations))
-cat("\nSummary Apredire:\n"); print(summary(Apredire))
+cat("\nSummary Apredire:\n"); print(summary(X_new))
 
 cat("\nNA par colonne (Observations):\n"); print(colSums(is.na(Observations)))
-cat("\nNA par colonne (Apredire):\n"); print(colSums(is.na(Apredire)))
+cat("\nNA par colonne (Apredire):\n"); print(colSums(is.na(X_new)))
 ```
+ Que des variables entre 0 et 1 de moyenne proche de 0.5. équivalent à tiré d'une loi uniforme dans [0,1]
 
 ## Visualisation du jeu de données
 ```{r}
@@ -133,7 +140,9 @@ ggplot(Observations, aes(x = X2, y = Y, color = X1_bin)) +
   ) +
   theme_minimal()
 ```
-Ces graphiques nous permettent de faire une analyse par bandes. On remarque pour chaque bande de X1, Y augmente avec X2. Les courbes ont aussi des formes très similaires et sont globalement parallèles. Il en est de même pour l'autre graphique. On peut déduire alors une influence plutôt additive de X1 et X2 sur Y, sans interaction forte visinle entre ces deux variables.
+Ces graphiques nous permettent de faire une analyse par bandes. On remarque pour chaque bande de X1, Y augmente avec X2. Les courbes ont aussi des formes très similaires et sont globalement parallèles. Il en est de même pour l'autre graphique. On peut déduire alors une influence plutôt additive de X1 et X2 sur Y, sans interaction forte visible entre ces deux variables.
+
+X1 par bandes de X2 montre homoscélasticité des résidus contrairement à X2 par bande de X1 où la variance des résidus semble augmenté en X2.
 
 ```{r}
 n_s <- 250
@@ -171,7 +180,84 @@ Comme le krigeage universel revient à faire une régression puis du krigeage si
 
 ## Régression
 ```{r}
+set.seed(12345)
+trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
 
+Xtrain <- X[trainIndex, ]
+Xtest  <- X[-trainIndex, ]
+Ytrain <- Y[trainIndex]
+Ytest  <- Y[-trainIndex]
+
+train_df1 <- data.frame(Y = Ytrain, Xtrain)
+train_df <- data.frame(Y = Ytrain, Xtrain[,c(1,2)])
+train_df2 <- data.frame(Y = Ytrain, Xtrain[,c(1,2,4,5)])ù
+
+# Test avec des termes d'ordres 2.
+rls_s2 <- lm(Y ~ polym(X1, X2, X3, X6, X7, degree = 2, raw = TRUE) +X4 + X5, data = train_df1)
+rls<- lm(Y ~ ., data = train_df)
+rls1 <- lm(Y ~ ., data = train_df1)
+rls2<- lm(Y ~ ., data = train_df2)
+rls1.s <- summary(rls)
+
+```
+
+```{r}
+rls1.s
+```
+
+```{r}
+
+df_test <- data.frame(Xtest)
+
+y_pred <- predict(rls, newdata = df_test)
+y_pred1<- predict(rls1, newdata = df_test)
+y_pred2<- predict(rls2, newdata = df_test)
+y_pred_s2<- predict(rls_s2, newdata = df_test)
+
+# Calcul du RMSE
+rmse <- sqrt(mean((Ytest - y_pred)^2))
+print(rmse)
+rmse1<- sqrt(mean((Ytest - y_pred1))^2)
+print(rmse1)
+rmse2<- sqrt(mean((Ytest - y_pred2))^2)
+print(rmse2)
+rmse_s2<- sqrt(mean((Ytest - y_pred_s2))^2)
+print(rmse_s2)
+```
+
+La meilleure RMSE obtenue par cross validation est celle obtenue en faisant la régression linéaire simple sur l'ensemble des variables avec une RMSE de 0.0065 contre 2.06 lorqu'on régresse que sur les 2 premières variables. L'essai avec les termes d'ordres 2 ne donne pas de meilleures résultats et on a un risque d'overfitting. 
+
+Maintenant qu'on a notre modèle de régression linéaire on va faire le krigeage sur les résidus. 
+
+```{r}
+
+res<- Ytest - y_pred1
+plot(res)
+print(mean(res))
+```
+
+Il semble toujours y avoir une tendance mais la moyenne est nulle donc on peut utiliser du krigeage simple. Le krigeage ordinaire aurait plus d'incertitude spatiale qui est dû à l'estimation de la moyenne du processus. 
+Cette tendance locale sera capturé par le krigeage. 
+
+
+Là ça marche pas parce que en gros il faut split 2 fois pour avoir res_train et res_test
+
+```{r}
+crossValidationError <- function(famille, theta) {
+
+    monModele <- km(formula = ~1, design = Xtrain, response = res, covtype = famille, coef.trend = 0,  coef.cov = theta, coef.var = 1)
+  prediction <- predict(object = monModele, newdata = Xtest , type="SK" , checkNames=FALSE, se.compute=FALSE)  
+
+  error =  (mean((prediction$mean -res)^2))   
+  
+  return(error)
+}
+#d est le nombre de variable 
+# Theta isotrope pour l'essai. 
+theta_vec <- rep(0.05, d)
+
+essai <- crossValidationError("matern3_2", theta_vec)
+message("erreur =", essai)
 ```
 
 
