@@ -274,8 +274,8 @@ essai <- crossValidationError("matern3_2", theta_vec)
 message("erreur =", essai)
 ```
 ```{r}
-familles <- c("exp", "matern3_2") 
-thetas_a_tester <- c(0.2, 0.3, 0.4, 0.5)
+familles <- c("exp", "matern3_2", "matern5_2") 
+thetas_a_tester <- c(1, 5, 10, 20, 25)
 
 resultats <- expand.grid(Famille = familles, Theta = thetas_a_tester)
 resultats$RMSE <- NA
@@ -309,46 +309,8 @@ if(meilleur_rmse < rmse_reg_seule) {
 }
 ```
 
-
-## Variogramme empirique
-```{r}
-data_sp <- Observations
-coordinates(data_sp) <- ~ X1 + X2
-
-# distance max entre points (dans l'espace X1,X2)
-dmax <- spDists(coordinates(data_sp), longlat = FALSE)
-dmax <- max(dmax)
-
-# choix standards (robustes)
-cutoff_val <- 0.5 * dmax
-width_val  <- cutoff_val / 15  # ~15 classes
-
-vg_Y <- variogram(Y ~ 1, data_sp, cutoff = cutoff_val, width = width_val)
-plot(vg_Y, main = "Variogramme empirique - Y brut")
-```
-
-
-```{r}
-# Ajustement tendance (additive simple)
-trend_lm <- lm(Y ~ X1 + X2, data = Observations)
-Observations$resid <- residuals(trend_lm)
-
-# repasser en objet spatial (avec la colonne resid)
-data_sp2 <- Observations
-coordinates(data_sp2) <- ~ X1 + X2
-
-vg_resid <- variogram(resid ~ 1, data_sp2, cutoff = cutoff_val, width = width_val)
-plot(vg_resid, main = "Variogramme empirique - Résidus (Y ~ X1 + X2)")
-```
-
-
-```{r}
-vg_dir <- variogram(resid ~ 1, data_sp2,
-                    alpha = c(0, 45, 90, 135),
-                    cutoff = cutoff_val, width = width_val)
-
-plot(vg_dir, main = "Variogrammes directionnels (résidus)")
-```
+A partir de theta = 30 on arrive plus a inverser la matrice de covariance. 
+Un $\theta$ très grand signifie que la corrélation s'étend à tout le domaine, indiquant que le phénomène varie de manière très lisse ou qu'il subsiste une tendance globale non capturée par la régression.
 
 ```{r}
 
