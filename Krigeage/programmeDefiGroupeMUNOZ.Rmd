@@ -1,0 +1,397 @@
+---
+title: "TP3 Krigeage - Challenge 2025-2026"
+output:
+  html_document: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#1. MUNOZ Enzo 
+#2. MUNIER Hugo
+#3. GUILBAUD Maxime
+```
+
+# Notre prédiction
+
+```{r seed}
+set.seed(1234)
+library(ggplot2)
+library(GGally)
+library(sp)
+library(DiceKriging)
+library(caret)
+library(FactoMineR)
+library(gstat)
+```
+
+## Collecte du jeu de données
+```{r}
+Observations <- read.csv("defi_observations.csv", header = TRUE)
+X<- Observations[,-8]
+Y<- Observations[,8]
+n<- length(Y)
+d<- length(X)
+
+X_new = read.csv("DefiGroupeMUNOZ.csv", header = TRUE)
+range_Y<- max(Y) - min(Y)
+```
+
+## Collecte du jeu de données
+```{r}
+cat("Observations : ", nrow(Observations), "lignes,", ncol(Observations), "colonnes\n")
+cat("Apredire     : ", nrow(X_new),     "lignes,", ncol(X_new),     "colonnes\n")
+
+cat("\nColonnes Observations :\n"); print(colnames(Observations))
+cat("\nColonnes Apredire :\n"); print(colnames(X_new))
+
+cat("\nStructure Observations:\n"); str(Observations)
+cat("\nStructure Apredire:\n"); str(X_new)
+
+cat("\nSummary Observations:\n"); print(summary(Observations))
+cat("\nSummary Apredire:\n"); print(summary(X_new))
+
+cat("\nNA par colonne (Observations):\n"); print(colSums(is.na(Observations)))
+cat("\nNA par colonne (Apredire):\n"); print(colSums(is.na(X_new)))
+```
+ Il n'y a que des variables entre 0 et 1 de moyenne proche de 0.5, ce qui est équivalent a tiré une loi uniforme dans [0,1].
+
+## Visualisation du jeu de données
+```{r}
+Xcols <- paste0("X", 1:7)
+
+ggpairs(
+  Observations,
+  columns = which(colnames(Observations) %in% Xcols),
+  aes(color = Y, alpha = 0.6),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag  = list(continuous = "densityDiag")
+) +
+  scale_color_viridis_c() +
+  theme(
+    legend.position = "none",
+    axis.text  = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+
+ggplot(Observations, aes(x = X1, y = X2, color = Y)) +
+  geom_point(size = 2) +
+  scale_color_viridis_c() +
+  labs(
+    title = "Visualisation brute des observations",
+    x = "X1",
+    y = "X2",
+    color = "Y"
+  ) +
+  theme_minimal()
+```
+En examinant cette matrice, on voit clairement que Y augmente lorsque les varaibles X1 et X2 augmentent. En revanche, aucune relation claire n'apparait entre les variables X3 à X7. Les valeurs de Y sont dispersées. On en déduit que X1 et X2 jouent un rôle important dans la structuration de Y. 
+
+```{r}
+# Y ~ X1
+ggplot(Observations, aes(x = X1, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X1", x = "X1", y = "Y") +
+  theme_minimal()
+
+# Y ~ X2
+ggplot(Observations, aes(x = X2, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X2", x = "X2", y = "Y") +
+  theme_minimal()
+```
+Ces deux graphiques confirment que Y a une tendance globale croissante en fonction de X1 et de X2. Mais cette tendance est plus prononcée pour X2. De plus, on remarque sur les deux graphiques la présence d'une dispersion. Ces deux graphes nous conduisent à faire recours à un krigeage avec une tendance, soit le krigeage universel. 
+
+```{r}
+# Création de bandes de X2 (4 groupes)
+Observations$X2_bin <- cut(
+  Observations$X2,
+  breaks = quantile(Observations$X2, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X1, y = Y, color = X2_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X1 par bandes de X2 (tester additif vs interaction)",
+    x = "X1", y = "Y", color = "Bande X2"
+  ) +
+  theme_minimal()
+
+Observations$X1_bin <- cut(
+  Observations$X1,
+  breaks = quantile(Observations$X1, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X2, y = Y, color = X1_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X2 par bandes de X1 (tester additif vs interaction)",
+    x = "X2", y = "Y", color = "Bande X1"
+  ) +
+  theme_minimal()
+```
+Ces graphiques nous permettent de faire une analyse par bandes. On remarque pour chaque bande de X1, Y augmente avec X2. Les courbes ont aussi des formes très similaires et sont globalement parallèles. Il en est de même pour l'autre graphique. On peut déduire alors une influence plutôt additive de X1 et X2 sur Y, sans interaction forte visible entre ces deux variables.
+
+X1 par bandes de X2 montre homoscélasticité des résidus contrairement à X2 par bande de X1 où la variance des résidus semble augmenté en X2.
+
+```{r}
+n_s <- 250
+idx <- sample(1:nrow(Observations), n_s)
+S <- Observations[idx, c("X1", "X2", "Y")]
+
+# Construire quelques paires aléatoires
+m <- 4000
+i <- sample(1:n_s, m, replace = TRUE)
+j <- sample(1:n_s, m, replace = TRUE)
+
+dx <- S$X1[i] - S$X1[j]
+dy <- S$X2[i] - S$X2[j]
+dist_ij <- sqrt(dx^2 + dy^2)
+dY <- abs(S$Y[i] - S$Y[j])
+
+df_pairs <- data.frame(dist = dist_ij, dY = dY)
+
+ggplot(df_pairs, aes(x = dist, y = dY)) +
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Variabilité locale : |ΔY| en fonction de la distance (X1,X2)",
+    x = "Distance entre points",
+    y = "|ΔY|"
+  ) +
+  theme_minimal()
+```
+On a voulu évaluer la dépendance spatiale de Y. Pour cela, on a tracé la différence absolue des valeurs de Y en fonction de la distance entre les points. On voit que les différences de Y augmentent avec la distance. Ainsi, les points proches présentent des valeurs plus similaires que les points éloignés. De plus, on voit que pour des distances très faible la différence absolue n'est pas forcément nulle ce qui suggère une variabilité locale.
+
+## Hypothèses de modélisation
+Notre analyse visuelle met en évidence une tendance globale de la variable Y selon les variables X1 et X2. Par conséquent, un krigeage simple ou ordinaire n’est pas adapté. Les effets de X1 et X2 apparaissant principalement additifs. De plus, la variabilité locale observée suggère un phénomène globalement lisse, mais bruité à petite échelle. Le processus n’est donc pas stationnaire, mais on suppose qu'il peut le devenir en enlevant de la tendance. Finalement, l'ensemble de ces arguments nous conduisent à faire du krigeage universel.
+
+Comme le krigeage universel revient à faire une régression puis du krigeage simple ou ordinaire sur les résidus. On va faire la régression dans la suite
+
+## Régression
+```{r}
+set.seed(1234)
+trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
+
+Xtrain <- X[trainIndex, ]
+Xtest  <- X[-trainIndex, ]
+Ytrain <- Y[trainIndex]
+Ytest  <- Y[-trainIndex]
+
+train_df1 <- data.frame(Y = Ytrain, Xtrain)
+train_df <- data.frame(Y = Ytrain, Xtrain[,c(1,2)])
+train_df2 <- data.frame(Y = Ytrain, Xtrain[,c(1,2,4,5)])
+test_df1<- data.frame(Y = Ytest, Xtest)
+# Test avec des termes d'ordres 2.
+rls_s2 <- lm(Y ~ polym(X1, X2, X3, X6, X7, degree = 2, raw = TRUE) +X4 + X5, data = train_df1)
+rls<- lm(Y ~ ., data = train_df)
+rls1 <- lm(Y ~ ., data = train_df1)
+rls2<- lm(Y ~ ., data = train_df2)
+rls1.s <- summary(rls)
+
+```
+
+```{r}
+rls1.s
+```
+
+```{r}
+set.seed(1234)
+
+df_test <- data.frame(Xtest)
+
+y_pred <- predict(rls, newdata = df_test)
+y_pred1<- predict(rls1, newdata = df_test)
+y_pred2<- predict(rls2, newdata = df_test)
+y_pred_s2<- predict(rls_s2, newdata = df_test)
+
+# Calcul du RMSE
+rmse <- sqrt(mean((Ytest - y_pred)^2))
+print(rmse)
+rmse1<- sqrt(mean((Ytest - y_pred1))^2)
+print(rmse1)
+rmse2<- sqrt(mean((Ytest - y_pred2))^2)
+print(rmse2)
+rmse_s2<- sqrt(mean((Ytest - y_pred_s2))^2)
+print(rmse_s2)
+```
+
+La meilleure RMSE obtenue par cross validation est celle obtenue en faisant la régression linéaire simple sur l'ensemble des variables avec une RMSE de 0.0812 contre 2.04lorqu'on régresse que sur les 2 premières variables. L'essai avec les termes d'ordres 2 ne donne pas de meilleures résultats et on a un risque d'overfitting. 
+
+Maintenant qu'on a notre modèle de régression linéaire on va faire le krigeage sur les résidus. 
+
+```{r}
+res<- Ytest - y_pred1
+plot(res)
+print(mean(res))
+```
+
+Les résidus sont centrés autour de zéro, et la moyenne est nulle donc on peut utiliser du krigeage simple. Le krigeage ordinaire aurait plus d'incertitude spatiale qui est dû à l'estimation de la moyenne du processus. 
+
+Là ça marche pas parce que en gros il faut split 2 fois pour avoir res_train et res_test
+
+```{r}
+set.seed(1234)
+
+res_train <- Ytrain - predict(rls1, newdata = train_df1)
+res_test  <- Ytest  - predict(rls1, newdata = test_df1)
+
+crossValidationError <- function(famille, theta) {
+  
+  # On entraîne sur les résidus du TRAIN uniquement
+  monModele <- km(formula = ~1, 
+                  design = Xtrain, 
+                  response = res_train, 
+                  covtype = famille, 
+                  coef.trend = 0,      # Krigeage Simple (moyenne 0)
+                  coef.cov = theta, 
+                  coef.var = var(res_train)) 
+  
+  prediction <- predict(object = monModele, newdata = Xtest, type="SK")  
+
+  # On compare aux résidus réels du TEST
+  error = mean((prediction$mean - res_test)^2)
+  #plot(res_test, type="l", col="red", main="Comparaison terme à terme")
+#lines(prediction$mean, col="blue", lty=2)
+#legend("topright", legend=c("Résidus réels", "Prédiction Krigeage"), col=c("red", "blue"), lty=1:2)
+  return(error)
+}
+
+theta_vec <- rep(0.3, d)
+
+essai <- crossValidationError("matern3_2", theta_vec)
+message("erreur =", essai)
+```
+```{r}
+familles <- c("exp", "matern3_2", "matern5_2") 
+thetas_a_tester <- c(1, 5, 10, 20, 25)
+
+resultats <- expand.grid(Famille = familles, Theta = thetas_a_tester)
+resultats$RMSE <- NA
+
+for(i in 1:nrow(resultats)) {
+  
+  f <- as.character(resultats$Famille[i])
+  t_val <- resultats$Theta[i]
+  
+  theta_vec <- rep(t_val, d) #isotrope
+  erreur_mse <- crossValidationError(f, theta_vec)
+  
+  resultats$RMSE[i] <- sqrt(erreur_mse)
+}
+
+resultats_tries <- resultats[order(resultats$RMSE), ]
+print(resultats_tries)
+
+rmse_reg_seule <- 0.812
+meilleur_rmse <- min(resultats$RMSE)
+
+message("\n--- BILAN ---")
+message("RMSE Régression seule : ", rmse_reg_seule)
+message("Meilleur RMSE avec Krigeage : ", meilleur_rmse)
+
+if(meilleur_rmse < rmse_reg_seule) {
+  gain <- (1 - meilleur_rmse/rmse_reg_seule) * 100
+  message("Succès ! Le krigeage améliore le modèle de ", round(gain, 2), "%")
+} else {
+  message("Le krigeage n'améliore pas la régression avec ces paramètres.")
+}
+```
+Vous pouvez plot nos figures en enlevant les # aux lignes 265,266,267.
+A partir de theta = 30 on arrive plus a inverser la matrice de covariance. 
+Un $\theta$ très grand signifie que la corrélation s'étend à tout le domaine, indiquant que le phénomène varie de manière très lisse ou qu'il subsiste une tendance globale non capturée par la régression.
+
+## Modèle Krigeage Universel
+```{r}
+set.seed(1234)
+
+res_train <- Ytrain - predict(rls1, newdata = train_df1)
+
+colsX <- paste0("X", 1:7)
+
+Xtrain_mat <- as.matrix(Xtrain[, colsX, drop = FALSE])
+Xtest_mat  <- as.matrix(Xtest[,  colsX, drop = FALSE])
+
+theta_opt <- rep(25, length(colsX))
+sigma2_opt <- var(res_train)
+
+modele_residus_final <- km(
+  formula     = ~1,
+  design      = Xtrain_mat,
+  response    = res_train,
+  covtype     = "matern5_2",
+  coef.trend  = 0,
+  coef.cov    = theta_opt,
+  coef.var    = var(res_train)
+)
+```
+
+```{r}
+test_df1 <- data.frame(Y = Ytest, Xtest)
+
+trend_test <- predict(rls1, newdata = test_df1)
+res_test <- Ytest - trend_test
+
+pred_res_test <- predict(modele_residus_final, newdata = Xtest, type = "SK")
+res_test_hat <- pred_res_test$mean
+
+Ytest_hat_UK <- trend_test + res_test_hat
+
+rmse_UK <- sqrt(mean((Ytest - Ytest_hat_UK)^2))
+cat("RMSE Krigeage Universel (test) :", rmse_UK, "\n")
+```
+```{r}
+X_new <- read.csv("DefiGroupeMUNOZ.csv", header = TRUE)
+Xnew_mat <- as.matrix(X_new[, colsX, drop = FALSE])
+
+trend_new <- predict(rls1, newdata = X_new)
+pred_res_new <- predict(modele_residus_final, newdata = Xnew_mat, type = "SK")
+
+trend_new <- predict(rls1, newdata = X_new)
+X_new$Y <- trend_new + pred_res_new$mean
+
+write.csv(X_new, "defi_apredire_rempli.csv", row.names = FALSE)
+
+head(X_new)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
