@@ -1,0 +1,504 @@
+---
+title: "TP3 Krigeage - Challenge 2025-2026"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+#1. MUNOZ Enzo 
+#2. MUNIER Hugo
+#3. GUILBAUD Maxime
+```
+
+# Notre prédiction
+
+```{r seed}
+set.seed(123456)
+library(ggplot2)
+library(GGally)
+library(sp)
+library(DiceKriging)
+library(caret)
+library(FactoMineR)
+library(gstat)
+```
+
+## Collecte du jeu de données
+```{r}
+Observations <- read.csv("defi_observations.csv", header = TRUE)
+X<- Observations[,-8]
+Y<- Observations[,8]
+n<- length(Y)
+d<- length(X)
+
+X_new = read.csv("defi_apredire.csv", header = TRUE)
+range_Y<- max(Y) - min(Y)
+```
+
+## Collecte du jeu de données
+```{r}
+cat("Observations : ", nrow(Observations), "lignes,", ncol(Observations), "colonnes\n")
+cat("Apredire     : ", nrow(X_new),     "lignes,", ncol(X_new),     "colonnes\n")
+
+cat("\nColonnes Observations :\n"); print(colnames(Observations))
+cat("\nColonnes Apredire :\n"); print(colnames(X_new))
+
+cat("\nStructure Observations:\n"); str(Observations)
+cat("\nStructure Apredire:\n"); str(X_new)
+
+cat("\nSummary Observations:\n"); print(summary(Observations))
+cat("\nSummary Apredire:\n"); print(summary(X_new))
+
+cat("\nNA par colonne (Observations):\n"); print(colSums(is.na(Observations)))
+cat("\nNA par colonne (Apredire):\n"); print(colSums(is.na(X_new)))
+```
+ Il n'y a que des variables entre 0 et 1 de moyenne proche de 0.5, ce qui est équivalent a tiré une loi uniforme dans [0,1].
+
+## Visualisation du jeu de données
+```{r}
+Xcols <- paste0("X", 1:7)
+
+ggpairs(
+  Observations,
+  columns = which(colnames(Observations) %in% Xcols),
+  aes(color = Y, alpha = 0.6),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag  = list(continuous = "densityDiag")
+) +
+  scale_color_viridis_c() +
+  theme(
+    legend.position = "none",
+    axis.text  = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+
+ggplot(Observations, aes(x = X1, y = X2, color = Y)) +
+  geom_point(size = 2) +
+  scale_color_viridis_c() +
+  labs(
+    title = "Visualisation brute des observations",
+    x = "X1",
+    y = "X2",
+    color = "Y"
+  ) +
+  theme_minimal()
+```
+En examinant cette matrice, on voit clairement que Y augmente lorsque les varaibles X1 et X2 augmentent. En revanche, aucune relation claire n'apparait entre les variables X3 à X7. Les valeurs de Y sont dispersées. On en déduit que X1 et X2 jouent un rôle important dans la structuration de Y. 
+
+```{r}
+# Y ~ X1
+ggplot(Observations, aes(x = X1, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X1", x = "X1", y = "Y") +
+  theme_minimal()
+
+# Y ~ X2
+ggplot(Observations, aes(x = X2, y = Y)) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(title = "Tendance globale : Y en fonction de X2", x = "X2", y = "Y") +
+  theme_minimal()
+```
+Ces deux graphiques confirment que Y a une tendance globale croissante en fonction de X1 et de X2. Mais cette tendance est plus prononcée pour X2. De plus, on remarque sur les deux graphiques la présence d'une dispersion. Ces deux graphes nous conduisent à faire recours à un krigeage avec une tendance, soit le krigeage universel. 
+
+```{r}
+# Création de bandes de X2 (4 groupes)
+Observations$X2_bin <- cut(
+  Observations$X2,
+  breaks = quantile(Observations$X2, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X1, y = Y, color = X2_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X1 par bandes de X2 (tester additif vs interaction)",
+    x = "X1", y = "Y", color = "Bande X2"
+  ) +
+  theme_minimal()
+
+Observations$X1_bin <- cut(
+  Observations$X1,
+  breaks = quantile(Observations$X1, probs = seq(0, 1, 0.25)),
+  include.lowest = TRUE
+)
+
+ggplot(Observations, aes(x = X2, y = Y, color = X1_bin)) +
+  geom_point(alpha = 0.25, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Y ~ X2 par bandes de X1 (tester additif vs interaction)",
+    x = "X2", y = "Y", color = "Bande X1"
+  ) +
+  theme_minimal()
+```
+Ces graphiques nous permettent de faire une analyse par bandes. On remarque pour chaque bande de X1, Y augmente avec X2. Les courbes ont aussi des formes très similaires et sont globalement parallèles. Il en est de même pour l'autre graphique. On peut déduire alors une influence plutôt additive de X1 et X2 sur Y, sans interaction forte visible entre ces deux variables.
+
+X1 par bandes de X2 montre homoscélasticité des résidus contrairement à X2 par bande de X1 où la variance des résidus semble augmenté en X2.
+
+```{r}
+n_s <- 250
+idx <- sample(1:nrow(Observations), n_s)
+S <- Observations[idx, c("X1", "X2", "Y")]
+
+# Construire quelques paires aléatoires
+m <- 4000
+i <- sample(1:n_s, m, replace = TRUE)
+j <- sample(1:n_s, m, replace = TRUE)
+
+dx <- S$X1[i] - S$X1[j]
+dy <- S$X2[i] - S$X2[j]
+dist_ij <- sqrt(dx^2 + dy^2)
+dY <- abs(S$Y[i] - S$Y[j])
+
+df_pairs <- data.frame(dist = dist_ij, dY = dY)
+
+ggplot(df_pairs, aes(x = dist, y = dY)) +
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(se = FALSE) +
+  labs(
+    title = "Variabilité locale : |ΔY| en fonction de la distance (X1,X2)",
+    x = "Distance entre points",
+    y = "|ΔY|"
+  ) +
+  theme_minimal()
+```
+On a voulu évaluer la dépendance spatiale de Y. Pour cela, on a tracé la différence absolue des valeurs de Y en fonction de la distance entre les points. On voit que les différences de Y augmentent avec la distance. Ainsi, les points proches présentent des valeurs plus similaires que les points éloignés. De plus, on voit que pour des distances très faible la différence absolue n'est pas forcément nulle ce qui suggère une variabilité locale.
+
+## Hypothèses de modélisation
+Notre analyse visuelle met en évidence une tendance globale de la variable Y selon les variables X1 et X2. Par conséquent, un krigeage simple ou ordinaire n’est pas adapté. Les effets de X1 et X2 apparaissant principalement additifs. De plus, la variabilité locale observée suggère un phénomène globalement lisse, mais bruité à petite échelle. Le processus n’est donc pas stationnaire, mais on suppose qu'il peut le devenir en enlevant de la tendance. Finalement, l'ensemble de ces arguments nous conduisent à faire du krigeage universel.
+
+Comme le krigeage universel revient à faire une régression puis du krigeage simple ou ordinaire sur les résidus. On va faire la régression dans la suite
+
+## Régression
+```{r}
+set.seed(12345)
+trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
+
+Xtrain <- X[trainIndex, ]
+Xtest  <- X[-trainIndex, ]
+Ytrain <- Y[trainIndex]
+Ytest  <- Y[-trainIndex]
+
+train_df1 <- data.frame(Y = Ytrain, Xtrain)
+train_df <- data.frame(Y = Ytrain, Xtrain[,c(1,2)])
+train_df2 <- data.frame(Y = Ytrain, Xtrain[,c(1,2,4,5)])
+
+# Test avec des termes d'ordres 2.
+rls_s2 <- lm(Y ~ polym(X1, X2, X3, X6, X7, degree = 2, raw = TRUE) +X4 + X5, data = train_df1)
+rls<- lm(Y ~ ., data = train_df)
+rls1 <- lm(Y ~ ., data = train_df1)
+rls2<- lm(Y ~ ., data = train_df2)
+rls1.s <- summary(rls)
+
+```
+
+```{r}
+rls1.s
+```
+
+```{r}
+
+df_test <- data.frame(Xtest)
+
+y_pred <- predict(rls, newdata = df_test)
+y_pred1<- predict(rls1, newdata = df_test)
+y_pred2<- predict(rls2, newdata = df_test)
+y_pred_s2<- predict(rls_s2, newdata = df_test)
+
+# Calcul du RMSE
+rmse <- sqrt(mean((Ytest - y_pred)^2))
+print(rmse)
+rmse1<- sqrt(mean((Ytest - y_pred1))^2)
+print(rmse1)
+rmse2<- sqrt(mean((Ytest - y_pred2))^2)
+print(rmse2)
+rmse_s2<- sqrt(mean((Ytest - y_pred_s2))^2)
+print(rmse_s2)
+```
+
+La meilleure RMSE obtenue par cross validation est celle obtenue en faisant la régression linéaire simple sur l'ensemble des variables avec une RMSE de 0.0065 contre 2.06 lorqu'on régresse que sur les 2 premières variables. L'essai avec les termes d'ordres 2 ne donne pas de meilleures résultats et on a un risque d'overfitting. 
+
+Maintenant qu'on a notre modèle de régression linéaire on va faire le krigeage sur les résidus. 
+
+```{r}
+
+res<- Ytest - y_pred1
+plot(res)
+print(mean(res))
+```
+
+Les résidus sont centrés autour de z&éro, et la moyenne est nulle donc on peut utiliser du krigeage simple. Le krigeage ordinaire aurait plus d'incertitude spatiale qui est dû à l'estimation de la moyenne du processus. 
+Cette tendance locale sera capturé par le krigeage. 
+
+```{r}
+res_df <- data.frame(
+  x = Xtest$X1,
+  y = Xtest$X2,
+  res = res
+)
+
+plot(res_df$x, res_df$y,
+     pch = 19,
+     col = ifelse(res_df$res >= 0, "red", "blue"),
+     xlab = "X1 (coordonnée x)",
+     ylab = "X2 (coordonnée y)",
+     main = "Résidus dans l'espace\nRouge=positif, Bleu=négatif")
+
+abline(h = mean(res_df$y), v = mean(res_df$x), lty = 3, col = "grey70")
+
+```
+Nous avons décidé de regarder le signe des résidus afin de verifer l'absence de biais dans l'espace. Ici, on observe un mélange homogène des résidus positifs et négatifs. On en déduit alors que la moyenne résiduelle est nulle et qu'il n y'a pas de tendance spatiale. On peut donc appliquer un krigeage sur les résidus. 
+
+## Variogramme empirique sur les résidus
+```{r}
+yhat_train <- predict(rls1, newdata = data.frame(Xtrain))
+res_train  <- Ytrain - yhat_train
+
+df_res_train <- data.frame(X1 = Xtrain$X1, X2 = Xtrain$X2, res = res_train)
+coordinates(df_res_train) <- ~ X1 + X2
+
+vg_emp <- variogram(res ~ 1, data = df_res_train)
+plot(vg_emp, main = "Variogramme empirique des résidus (TRAIN)")
+```
+L'objectif de ce variogramme empirique des réisuds est d'identifier une dépendance spatiale des résidus. On observe une augmentation progressive de la semi-variance avec la distance. On en déduit que des résidus proches spatialement sont plus similaires que ceux éloignés, et ainsi la présence d'une dépendance spatiale des résidus. De plus, on observe que pour des faibles distances la semi-variance est non nulle. Alors, on peut dire qu'il existe un effet nugget. Enfin, on observe aucun palier sur le domaine étudié. Donc, on pense qu'il y a une corrélation spatiale qui est supérieur à la distance maximale observée.
+Avec les informations que l'on a déduites, on pense plutôt utiliser un modèle de variogramme exponentiel car il est plus adapté à une corrélation spatiale de longue portée. Nous souhaitons pas utilisé un modèle gaussien car il suppose ici une structure des résidus très lisse à courte distance, ce qui n'est pas le cas avec la présence d'un effet nugget.
+
+## Ajustement du modèle de variogramme expnonentiel
+```{r}
+sill0   <- var(res_train)
+range0  <- max(vg_emp$dist) / 3 
+nugget0 <- min(vg_emp$gamma)
+
+vg_init <- vgm(psill = max(sill0 - nugget0, 1e-12),
+               model = "Exp",
+               range = range0,
+               nugget = max(nugget0, 0))
+
+vg_fit <- fit.variogram(vg_emp, model = vg_init)
+
+print(vg_fit)
+plot(vg_emp, vg_fit, main = "Variogramme empirique + modèle exponentiel ajusté")
+
+nugget_est <- vg_fit$psill[vg_fit$model == "Nug"]
+sill_est   <- sum(vg_fit$psill)
+psill_est  <- vg_fit$psill[vg_fit$model == "Exp"]
+range_est  <- vg_fit$range[vg_fit$model == "Exp"]
+
+cat("Paramètres du variogramme exponentiel (θ)\n")
+cat("-----------------------------------------\n")
+cat("Nugget (pépite)          :", round(nugget_est, 4), "\n")
+cat("Variance structurée     :", round(psill_est, 4), "\n")
+cat("Sill total (nug+psill)  :", round(sill_est, 4), "\n")
+cat("Range (portée)          :", round(range_est, 4), "\n\n")
+
+dmax <- max(sp::spDists(df_res_train))
+ratio_range_domain <- range_est / dmax
+
+cat("Distance maximale du domaine :", round(dmax, 4), "\n")
+cat("Ratio range / domaine :", round(ratio_range_domain, 2), "\n")
+```
+L’ajustement du modèle exponentiel conduit à une portée estimée largement supérieure à la taille du domaine spatial étudié. Cela indique une corrélation spatiale résiduelle de longue portée, dont le palier n’est pas observable sur le domaine disponible. Le modèle exponentiel permet néanmoins de représenter de manière cohérente la tendance globale du variogramme empirique, sans imposer artificiellement une portée finie. L’effet pépite non nul traduit une variabilité à très courte distance ou un bruit de mesure.
+
+## Krigeage universel
+```{r}
+test_sp <- data.frame(Xtest)
+coordinates(test_sp) <- ~ X1 + X2
+
+
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Là ça marche pas parce que en gros il faut split 2 fois pour avoir res_train et res_test
+
+```{r}
+crossValidationError <- function(famille, theta) {
+
+    monModele <- km(formula = ~1, design = Xtrain, response = res, covtype = famille, coef.trend = 0,  coef.cov = theta, coef.var = 1)
+  prediction <- predict(object = monModele, newdata = Xtest , type="SK" , checkNames=FALSE, se.compute=FALSE)  
+
+  error =  (mean((prediction$mean -res)^2))   
+  
+  return(error)
+}
+#d est le nombre de variable 
+# Theta isotrope pour l'essai. 
+theta_vec <- rep(0.05, d)
+
+essai <- crossValidationError("matern3_2", theta_vec)
+message("erreur =", essai)
+```
+
+
+## Variogramme empirique
+```{r}
+data_sp <- Observations
+coordinates(data_sp) <- ~ X1 + X2
+
+# distance max entre points (dans l'espace X1,X2)
+dmax <- spDists(coordinates(data_sp), longlat = FALSE)
+dmax <- max(dmax)
+
+# choix standards (robustes)
+cutoff_val <- 0.5 * dmax
+width_val  <- cutoff_val / 15  # ~15 classes
+
+vg_Y <- variogram(Y ~ 1, data_sp, cutoff = cutoff_val, width = width_val)
+plot(vg_Y, main = "Variogramme empirique - Y brut")
+```
+
+```{r}
+# Ajustement tendance (additive simple)
+trend_lm <- lm(Y ~ X1 + X2, data = Observations)
+Observations$resid <- residuals(trend_lm)
+
+# repasser en objet spatial (avec la colonne resid)
+data_sp2 <- Observations
+coordinates(data_sp2) <- ~ X1 + X2
+
+vg_resid <- variogram(resid ~ 1, data_sp2, cutoff = cutoff_val, width = width_val)
+plot(vg_resid, main = "Variogramme empirique - Résidus (Y ~ X1 + X2)")
+```
+
+```{r}
+vg_dir <- variogram(resid ~ 1, data_sp2,
+                    alpha = c(0, 45, 90, 135),
+                    cutoff = cutoff_val, width = width_val)
+
+plot(vg_dir, main = "Variogrammes directionnels (résidus)")
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Voici un exemple pour l'import et l'export:
+
+```{r import export données}
+# ce qui est donné:
+
+# lecture: Observations contient les X et les Y correspondants
+Observations = read.csv("defi_observations.csv", header = TRUE)
+
+# lecture: Apredire ne contient que des X, il faut prédire les Y
+Apredire = read.csv("defi_apredire.csv", header = TRUE)
+
+# Votre prédiction; faites mieux, hein ;-)
+Y = Apredire$X1 + mean(Observations$Y)
+# votre Y prédit ici X1 + la moyenne des Y, c'est très mauvais!
+
+# Votre exportation
+# On concatène d'abord les X avec le Y prédit à l'aide de cbind
+MonFichierSoumis =  cbind(Apredire, Y)
+
+# puis on exporte
+MonNomDeFichier = "DefiGroupeDURAND.csv" # nom de fichier à adapter hein!!!
+write.csv(MonFichierSoumis, MonNomDeFichier, row.names = FALSE)
+
+#on vérifie que c'est bien lisible
+LectureDeMonFichier = read.csv(MonNomDeFichier, header = TRUE)
+
+#on fait des vérifications élémentaires, bon nombre de lignes, de colonnes, etc.
+#on ne doit voir apparaître que des TRUE, sinon ce n'est pas bon!
+message(nrow(LectureDeMonFichier) == 100, ": bon nombre de lignes")
+message(ncol(LectureDeMonFichier) == 8, ": bon nombre de colonnes")
+message(abs(LectureDeMonFichier[37,3]-Apredire[37,3])<1e-6, ": X3 semble ok pour la ligne 37")
+message(sum(colnames(LectureDeMonFichier)==c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "Y")) == 8, ": les colonnes sont bien nommées")
+```
+
+Voilà, c'est à vous, vous n'avez plus qu'à faire vos prédictions! en remplaçant la ligne `Y = Apredire$X1 + mean(Observations$Y)` bien sûr!
+
+Bon courage!
+
