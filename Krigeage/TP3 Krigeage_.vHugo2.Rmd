@@ -8,6 +8,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 ```{r}
 #1. MUNOZ Enzo 
 #2. MUNIER Hugo
@@ -17,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Notre prédiction
 
 ```{r seed}
-set.seed(123456)
+set.seed(1234)
 library(ggplot2)
 library(GGally)
 library(sp)
@@ -180,7 +181,7 @@ Comme le krigeage universel revient à faire une régression puis du krigeage si
 
 ## Régression
 ```{r}
-set.seed(12345)
+set.seed(1234)
 trainIndex <- createDataPartition(Y, p = 0.8, list = FALSE)
 
 Xtrain <- X[trainIndex, ]
@@ -191,7 +192,7 @@ Ytest  <- Y[-trainIndex]
 train_df1 <- data.frame(Y = Ytrain, Xtrain)
 train_df <- data.frame(Y = Ytrain, Xtrain[,c(1,2)])
 train_df2 <- data.frame(Y = Ytrain, Xtrain[,c(1,2,4,5)])
-
+test_df1<- data.frame(Y = Ytest, Xtest)
 # Test avec des termes d'ordres 2.
 rls_s2 <- lm(Y ~ polym(X1, X2, X3, X6, X7, degree = 2, raw = TRUE) +X4 + X5, data = train_df1)
 rls<- lm(Y ~ ., data = train_df)
@@ -206,6 +207,7 @@ rls1.s
 ```
 
 ```{r}
+set.seed(1234)
 
 df_test <- data.frame(Xtest)
 
@@ -225,278 +227,86 @@ rmse_s2<- sqrt(mean((Ytest - y_pred_s2))^2)
 print(rmse_s2)
 ```
 
-La meilleure RMSE obtenue par cross validation est celle obtenue en faisant la régression linéaire simple sur l'ensemble des variables avec une RMSE de 0.0065 contre 2.06 lorqu'on régresse que sur les 2 premières variables. L'essai avec les termes d'ordres 2 ne donne pas de meilleures résultats et on a un risque d'overfitting. 
+La meilleure RMSE obtenue par cross validation est celle obtenue en faisant la régression linéaire simple sur l'ensemble des variables avec une RMSE de 0.0812 contre 2.04lorqu'on régresse que sur les 2 premières variables. L'essai avec les termes d'ordres 2 ne donne pas de meilleures résultats et on a un risque d'overfitting. 
 
 Maintenant qu'on a notre modèle de régression linéaire on va faire le krigeage sur les résidus. 
 
 ```{r}
-
 res<- Ytest - y_pred1
 plot(res)
 print(mean(res))
 ```
 
-Les résidus sont centrés autour de z&éro, et la moyenne est nulle donc on peut utiliser du krigeage simple. Le krigeage ordinaire aurait plus d'incertitude spatiale qui est dû à l'estimation de la moyenne du processus. 
-Cette tendance locale sera capturé par le krigeage. 
-
-```{r}
-res_df <- data.frame(
-  x = Xtest$X1,
-  y = Xtest$X2,
-  res = res
-)
-
-plot(res_df$x, res_df$y,
-     pch = 19,
-     col = ifelse(res_df$res >= 0, "red", "blue"),
-     xlab = "X1 (coordonnée x)",
-     ylab = "X2 (coordonnée y)",
-     main = "Résidus dans l'espace\nRouge=positif, Bleu=négatif")
-
-abline(h = mean(res_df$y), v = mean(res_df$x), lty = 3, col = "grey70")
-
-```
-Nous avons décidé de regarder le signe des résidus afin de verifer l'absence de biais dans l'espace. Ici, on observe un mélange homogène des résidus positifs et négatifs. On en déduit alors que la moyenne résiduelle est nulle et qu'il n y'a pas de tendance spatiale. On peut donc appliquer un krigeage sur les résidus. 
-
-## Variogramme empirique sur les résidus
-```{r}
-yhat_train <- predict(rls1, newdata = data.frame(Xtrain))
-res_train  <- Ytrain - yhat_train
-
-df_res_train <- data.frame(X1 = Xtrain$X1, X2 = Xtrain$X2, res = res_train)
-coordinates(df_res_train) <- ~ X1 + X2
-
-vg_emp <- variogram(res ~ 1, data = df_res_train)
-plot(vg_emp, main = "Variogramme empirique des résidus (TRAIN)")
-```
-L'objectif de ce variogramme empirique des réisuds est d'identifier une dépendance spatiale des résidus. On observe une augmentation progressive de la semi-variance avec la distance. On en déduit que des résidus proches spatialement sont plus similaires que ceux éloignés, et ainsi la présence d'une dépendance spatiale des résidus. De plus, on observe que pour des faibles distances la semi-variance est non nulle. Alors, on peut dire qu'il existe un effet nugget. Enfin, on observe aucun palier sur le domaine étudié. Donc, on pense qu'il y a une corrélation spatiale qui est supérieur à la distance maximale observée.
-Avec les informations que l'on a déduites, on pense plutôt utiliser un modèle de variogramme exponentiel car il est plus adapté à une corrélation spatiale de longue portée. Nous souhaitons pas utilisé un modèle gaussien car il suppose ici une structure des résidus très lisse à courte distance, ce qui n'est pas le cas avec la présence d'un effet nugget.
-
-## Estimation des thétas pas Cross-Validation
-
-Afin d'avoir une estimation plus précise des thétas, on décide de les estimer par cross-validation sur les résidus.
-
-```{r}
-data_sp <- Observations
-coordinates(data_sp) <- ~ X1 + X2
-
-n <- nrow(data_sp)
-
-dmax <- max(spDists(coordinates(data_sp), longlat = FALSE))
-cutoff_val <- 0.5 * dmax
-```
-
-```{r}
-rmse_internal_theta <- function(train_df, vgm_try, k = 5, seed = 123) {
-  set.seed(seed)
-  idx <- sample(rep(1:k, length.out = nrow(train_df)))
-  errs <- c()
-
-  for (fold in 1:k) {
-    tr <- train_df[idx != fold, ]
-    te <- train_df[idx == fold, ]
-
-    # Régression (tendance) refaite sur tr
-    lm_tr <- lm(Y ~ X1 + X2, data = tr)
-    tr$resid <- tr$Y - predict(lm_tr, newdata = tr)
-    te$resid <- te$Y - predict(lm_tr, newdata = te)
-
-    # Krigeage des résidus (OK sur tr -> prédire te)
-    coordinates(tr) <- ~ X1 + X2
-    coordinates(te) <- ~ X1 + X2
-
-    pred <- krige(resid ~ 1, tr, te, model = vgm_try)
-    errs <- c(errs, te$resid - pred$var1.pred)
-  }
-
-  sqrt(mean(errs^2, na.rm = TRUE))
-}
-```
-
-```{r}
-lm0 <- lm(Y ~ X1 + X2, data = as.data.frame(data_sp))
-res0 <- residuals(lm0)
-s2   <- var(res0, na.rm = TRUE)
-
-# grilles (à adapter si besoin)
-ranges  <- seq(cutoff_val/20, cutoff_val, length.out = 15)
-nuggets <- c(0, 0.01, 0.05, 0.1, 0.2) * s2
-psills  <- seq(0.2, 1.5, length.out = 12) * s2
-
-cov_models <- list(
-  Exp  = list(model = "Exp"),
-  Gau  = list(model = "Gau"),
-  Mat32 = list(model = "Mat", kappa = 1.5),
-  Mat52 = list(model = "Mat", kappa = 2.5)
-)
-```
-
-```{r}
-results <- data.frame()
-
-for (m in names(cov_models)) {
-
-  best <- list(rmse = Inf)
-
-  for (r in ranges) {
-    for (ng in nuggets) {
-      for (ps in psills) {
-
-        vgm_try <- vgm(
-          psill  = ps,
-          model  = cov_models[[m]]$model,
-          range  = r,
-          nugget = ng,
-          kappa  = cov_models[[m]]$kappa
-        )
-
-        rmse <- rmse_internal_theta(train_df, vgm_try, k = 5)
-
-        if (is.finite(rmse) && rmse < best$rmse) {
-          best <- list(
-            rmse   = rmse,
-            range  = r,
-            nugget = ng,
-            psill  = ps
-          )
-        }
-      }
-    }
-  }
-
-  results <- rbind(
-    results,
-    data.frame(
-      Model  = m,
-      RMSE   = best$rmse,
-      Range  = best$range,
-      Sill   = best$psill,
-      Nugget = best$nugget
-    )
-  )
-}
-
-results
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-
-
-
-## Ajustement du modèle de variogramme expnonentiel
-```{r}
-sill0   <- var(res_train)
-range0  <- max(vg_emp$dist) / 3 
-nugget0 <- min(vg_emp$gamma)
-
-vg_init <- vgm(psill = max(sill0 - nugget0, 1e-12),
-               model = "Exp",
-               range = range0,
-               nugget = max(nugget0, 0))
-
-vg_fit <- fit.variogram(vg_emp, model = vg_init)
-
-print(vg_fit)
-plot(vg_emp, vg_fit, main = "Variogramme empirique + modèle exponentiel ajusté")
-
-nugget_est <- vg_fit$psill[vg_fit$model == "Nug"]
-sill_est   <- sum(vg_fit$psill)
-psill_est  <- vg_fit$psill[vg_fit$model == "Exp"]
-range_est  <- vg_fit$range[vg_fit$model == "Exp"]
-
-cat("Paramètres du variogramme exponentiel (θ)\n")
-cat("-----------------------------------------\n")
-cat("Nugget (pépite)          :", round(nugget_est, 4), "\n")
-cat("Variance structurée     :", round(psill_est, 4), "\n")
-cat("Sill total (nug+psill)  :", round(sill_est, 4), "\n")
-cat("Range (portée)          :", round(range_est, 4), "\n\n")
-
-dmax <- max(sp::spDists(df_res_train))
-ratio_range_domain <- range_est / dmax
-
-cat("Distance maximale du domaine :", round(dmax, 4), "\n")
-cat("Ratio range / domaine :", round(ratio_range_domain, 2), "\n")
-```
-L’ajustement du modèle exponentiel conduit à une portée estimée largement supérieure à la taille du domaine spatial étudié. Cela indique une corrélation spatiale résiduelle de longue portée, dont le palier n’est pas observable sur le domaine disponible. Le modèle exponentiel permet néanmoins de représenter de manière cohérente la tendance globale du variogramme empirique, sans imposer artificiellement une portée finie. L’effet pépite non nul traduit une variabilité à très courte distance ou un bruit de mesure.
-
-## Krigeage universel
-```{r}
-test_sp <- data.frame(Xtest)
-coordinates(test_sp) <- ~ X1 + X2
-
-
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Les résidus sont centrés autour de zéro, et la moyenne est nulle donc on peut utiliser du krigeage simple. Le krigeage ordinaire aurait plus d'incertitude spatiale qui est dû à l'estimation de la moyenne du processus. 
 
 Là ça marche pas parce que en gros il faut split 2 fois pour avoir res_train et res_test
 
 ```{r}
+set.seed(1234)
+
+res_train <- Ytrain - predict(rls1, newdata = train_df1)
+res_test  <- Ytest  - predict(rls1, newdata = test_df1)
+
 crossValidationError <- function(famille, theta) {
-
-    monModele <- km(formula = ~1, design = Xtrain, response = res, covtype = famille, coef.trend = 0,  coef.cov = theta, coef.var = 1)
-  prediction <- predict(object = monModele, newdata = Xtest , type="SK" , checkNames=FALSE, se.compute=FALSE)  
-
-  error =  (mean((prediction$mean -res)^2))   
   
+  # On entraîne sur les résidus du TRAIN uniquement
+  monModele <- km(formula = ~1, 
+                  design = Xtrain, 
+                  response = res_train, 
+                  covtype = famille, 
+                  coef.trend = 0,      # Krigeage Simple (moyenne 0)
+                  coef.cov = theta, 
+                  coef.var = var(res_train)) 
+  
+  prediction <- predict(object = monModele, newdata = Xtest, type="SK")  
+
+  # On compare aux résidus réels du TEST
+  error = mean((prediction$mean - res_test)^2)
+  plot(res_test, type="l", col="red", main="Comparaison terme à terme")
+lines(prediction$mean, col="blue", lty=2)
+legend("topright", legend=c("Résidus réels", "Prédiction Krigeage"), col=c("red", "blue"), lty=1:2)
   return(error)
 }
-#d est le nombre de variable 
-# Theta isotrope pour l'essai. 
-theta_vec <- rep(0.05, d)
+
+theta_vec <- rep(0.3, d)
 
 essai <- crossValidationError("matern3_2", theta_vec)
 message("erreur =", essai)
+```
+```{r}
+familles <- c("exp", "matern3_2") 
+thetas_a_tester <- c(0.2, 0.3, 0.4, 0.5)
+
+resultats <- expand.grid(Famille = familles, Theta = thetas_a_tester)
+resultats$RMSE <- NA
+
+for(i in 1:nrow(resultats)) {
+  
+  f <- as.character(resultats$Famille[i])
+  t_val <- resultats$Theta[i]
+  
+  theta_vec <- rep(t_val, d) #isotrope
+  erreur_mse <- crossValidationError(f, theta_vec)
+  
+  resultats$RMSE[i] <- sqrt(erreur_mse)
+}
+
+resultats_tries <- resultats[order(resultats$RMSE), ]
+print(resultats_tries)
+
+rmse_reg_seule <- 0.812
+meilleur_rmse <- min(resultats$RMSE)
+
+message("\n--- BILAN ---")
+message("RMSE Régression seule : ", rmse_reg_seule)
+message("Meilleur RMSE avec Krigeage : ", meilleur_rmse)
+
+if(meilleur_rmse < rmse_reg_seule) {
+  gain <- (1 - meilleur_rmse/rmse_reg_seule) * 100
+  message("Succès ! Le krigeage améliore le modèle de ", round(gain, 2), "%")
+} else {
+  message("Le krigeage n'améliore pas la régression avec ces paramètres.")
+}
 ```
 
 
@@ -517,6 +327,7 @@ vg_Y <- variogram(Y ~ 1, data_sp, cutoff = cutoff_val, width = width_val)
 plot(vg_Y, main = "Variogramme empirique - Y brut")
 ```
 
+
 ```{r}
 # Ajustement tendance (additive simple)
 trend_lm <- lm(Y ~ X1 + X2, data = Observations)
@@ -529,6 +340,7 @@ coordinates(data_sp2) <- ~ X1 + X2
 vg_resid <- variogram(resid ~ 1, data_sp2, cutoff = cutoff_val, width = width_val)
 plot(vg_resid, main = "Variogramme empirique - Résidus (Y ~ X1 + X2)")
 ```
+
 
 ```{r}
 vg_dir <- variogram(resid ~ 1, data_sp2,
